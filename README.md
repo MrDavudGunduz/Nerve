@@ -94,8 +94,8 @@ flowchart LR
     API["REST API"] -->|JSON| NL["NetworkLayer"]
     NL -->|DTO| PA["PersistenceActor"]
     PA -->|Upsert| SD["SwiftData"]
-    SD -->|@Query| UI["SwiftUI Views"]
-    UI -->|Region Δ| CE["ClusterEngine"]
+    SD -->|Query| UI["SwiftUI Views"]
+    UI -->|"Region Δ"| CE["ClusterEngine"]
     CE -->|Clustered| UI
     PA -->|New Items| AI["AILayer"]
     AI -->|Analysis| PA

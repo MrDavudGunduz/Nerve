@@ -112,6 +112,12 @@
 			);
 			name = Nerve;
 			packageProductDependencies = (
+				A1000001AABB0001CCDD0001 /* Core */,
+				A1000001AABB0002CCDD0002 /* NetworkLayer */,
+				A1000001AABB0003CCDD0003 /* StorageLayer */,
+				A1000001AABB0004CCDD0004 /* MapFeature */,
+				A1000001AABB0005CCDD0005 /* ARFeature */,
+				A1000001AABB0006CCDD0006 /* AILayer */,
 			);
 			productName = Nerve;
 			productReference = E9B241892F73F4C0009F642D /* Nerve.app */;
@@ -197,6 +203,14 @@
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E9B2418A2F73F4C0009F642D /* Products */;
+			packageReferences = (
+				A2000001AABB0001CCDD0001 /* XCLocalSwiftPackageReference "Packages/Core" */,
+				A2000001AABB0002CCDD0002 /* XCLocalSwiftPackageReference "Packages/NetworkLayer" */,
+				A2000001AABB0003CCDD0003 /* XCLocalSwiftPackageReference "Packages/StorageLayer" */,
+				A2000001AABB0004CCDD0004 /* XCLocalSwiftPackageReference "Packages/MapFeature" */,
+				A2000001AABB0005CCDD0005 /* XCLocalSwiftPackageReference "Packages/ARFeature" */,
+				A2000001AABB0006CCDD0006 /* XCLocalSwiftPackageReference "Packages/AILayer" */,
+			);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -621,6 +635,60 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		A2000001AABB0001CCDD0001 /* XCLocalSwiftPackageReference "Packages/Core" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Core;
+		};
+		A2000001AABB0002CCDD0002 /* XCLocalSwiftPackageReference "Packages/NetworkLayer" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NetworkLayer;
+		};
+		A2000001AABB0003CCDD0003 /* XCLocalSwiftPackageReference "Packages/StorageLayer" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/StorageLayer;
+		};
+		A2000001AABB0004CCDD0004 /* XCLocalSwiftPackageReference "Packages/MapFeature" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/MapFeature;
+		};
+		A2000001AABB0005CCDD0005 /* XCLocalSwiftPackageReference "Packages/ARFeature" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ARFeature;
+		};
+		A2000001AABB0006CCDD0006 /* XCLocalSwiftPackageReference "Packages/AILayer" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/AILayer;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A1000001AABB0001CCDD0001 /* Core */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Core;
+		};
+		A1000001AABB0002CCDD0002 /* NetworkLayer */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NetworkLayer;
+		};
+		A1000001AABB0003CCDD0003 /* StorageLayer */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = StorageLayer;
+		};
+		A1000001AABB0004CCDD0004 /* MapFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MapFeature;
+		};
+		A1000001AABB0005CCDD0005 /* ARFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ARFeature;
+		};
+		A1000001AABB0006CCDD0006 /* AILayer */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AILayer;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = E9B241812F73F4C0009F642D /* Project object */;
 }

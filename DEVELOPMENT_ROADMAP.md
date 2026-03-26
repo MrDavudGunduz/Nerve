@@ -1,7 +1,7 @@
 # Nerve — Development Roadmap
 
 > **Timeline:** 5 Weeks  
-> **Last Updated:** March 25, 2026  
+> **Last Updated:** March 26, 2026  
 > **Project Overview:** See [README.md](README.md)
 
 ---
@@ -28,6 +28,12 @@ gantt
 
     section Phase 5
     QA, Testing & Optimization     :p5, after p4, 7d
+
+    section Testing (Continuous)
+    Unit Tests per Phase           :t1, 2026-03-25, 35d
+    Integration Tests              :t2, after p2, 21d
+    UI & Snapshot Tests            :t3, after p3, 14d
+    Performance Profiling          :t4, after p4, 7d
 ```
 
 ---
@@ -60,8 +66,8 @@ Establish a clean, scalable architecture that feeds iOS, macOS, and visionOS fro
 
 #### 1.2 — SPM Package Decomposition
 
-- [ ] Create six local SPM packages: `Core`, `NetworkLayer`, `StorageLayer`, `MapFeature`, `ARFeature`, `AILayer`.
-- [ ] Define `Package.swift` for each module with explicit platform declarations:
+- [x] Create six local SPM packages: `Core`, `NetworkLayer`, `StorageLayer`, `MapFeature`, `ARFeature`, `AILayer`.
+- [x] Define `Package.swift` for each module with explicit platform declarations:
 
 ```swift
 // Example: Core/Package.swift
@@ -82,8 +88,8 @@ let package = Package(
 )
 ```
 
-- [ ] Establish the **dependency graph** between modules (e.g., `MapFeature` depends on `Core`, `NetworkLayer`, `StorageLayer`).
-- [ ] Validate that each package compiles independently for all three platform destinations.
+- [x] Establish the **dependency graph** between modules (e.g., `MapFeature` depends on `Core`, `NetworkLayer`, `StorageLayer`).
+- [x] Validate that each package compiles independently for all three platform destinations.
 
 #### 1.3 — Dependency Injection & UI Isolation
 
@@ -92,11 +98,26 @@ let package = Package(
 - [ ] Ensure **zero UIKit/SwiftUI imports** in `Core`, `NetworkLayer`, `StorageLayer`, and `AILayer`.
 - [ ] Wire up the container at the app-entry point (`NerveApp.swift`) using `@Environment` for SwiftUI injection.
 
+#### 1.4 — Phase 1 Testing
+
+- [ ] Configure Swift Testing (`@Suite`, `@Test`) for all 6 package test targets.
+- [ ] Write unit tests for DI Container resolution and circular dependency detection.
+- [ ] Verify service protocol conformance with compile-time checks.
+- [ ] Validate all packages compile and test independently on all three platforms:
+
+```bash
+# CI Verification Script
+for pkg in Core NetworkLayer StorageLayer MapFeature ARFeature AILayer; do
+  swift test --package-path Packages/$pkg
+done
+```
+
 ### Acceptance Criteria
 
 - [x] All six packages compile successfully for iOS, macOS, and visionOS.
 - [x] `Core` module has no UI dependencies.
 - [x] A trivial "Hello World" view renders on all three platforms using shared logic from `Core`.
+- [ ] All package test targets pass with `swift test`.
 
 ---
 
@@ -179,11 +200,42 @@ actor PersistenceActor {
 
 > **Data Flow:** See [README.md → Data Flow](README.md#data-flow) for the full sync and rendering pipeline diagram.
 
+#### 2.4 — Phase 2 Testing
+
+- [ ] **NetworkLayer Unit Tests:** Use `MockURLProtocol` to test API client with zero network calls.
+- [ ] **StorageLayer Unit Tests:** Test `PersistenceActor` with in-memory `ModelContainer`:
+
+```swift
+@Suite("PersistenceActor Tests")
+struct PersistenceActorTests {
+  let actor: PersistenceActor
+
+  init() throws {
+    let config = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try ModelContainer(for: NewsItem.self, configurations: [config])
+    actor = PersistenceActor(container: container)
+  }
+
+  @Test("Upsert inserts new items and updates existing")
+  func upsertBehavior() async throws {
+    try await actor.upsertNews([NewsFixtures.sample])
+    let count = try await actor.fetchCount()
+    #expect(count == 1)
+  }
+}
+```
+
+- [ ] **Clustering Unit Tests:** Validate quad-tree algorithm with known coordinate sets.
+- [ ] **Integration Tests:** End-to-end sync pipeline test (mock API → persistence → query).
+- [ ] **Thread Sanitizer Run:** Execute full test suite with TSan enabled to catch data races.
+- [ ] Achieve **≥ 80% code coverage** for `NetworkLayer` and `StorageLayer`.
+
 ### Acceptance Criteria
 
 - [ ] 1,000 annotations render on the map at **60 FPS** on iPhone 15 Pro.
 - [ ] Full offline functionality: cached news appears instantly after toggling Airplane Mode.
 - [ ] No data races — verified via Xcode Thread Sanitizer (TSan).
+- [ ] All Phase 2 unit and integration tests pass on CI.
 
 ---
 
@@ -261,11 +313,45 @@ func analyzeNewsBatch(_ items: [NewsItem]) async {
 - [ ] Add a subtle **sentiment indicator** (emoji or color strip) to annotation detail popups.
 - [ ] Implement a filter control allowing users to hide clickbait-flagged stories from the map.
 
+#### 3.4 — Phase 3 Testing
+
+- [ ] **AILayer Unit Tests:** Test analyzer with pre-computed model outputs (deterministic fixtures):
+
+```swift
+@Suite("NewsAnalyzer Tests")
+struct NewsAnalyzerTests {
+  @Test("Detects clickbait headlines with high confidence")
+  func clickbaitDetection() async throws {
+    let analyzer = NewsAnalyzer()
+    let result = try await analyzer.analyzeHeadline(
+      "You Won't BELIEVE What Happened Next!"
+    )
+    #expect(result.clickbaitScore > 0.7)
+    #expect(result.confidence > 0.8)
+  }
+
+  @Test("Classifies genuine headlines correctly")
+  func genuineHeadline() async throws {
+    let analyzer = NewsAnalyzer()
+    let result = try await analyzer.analyzeHeadline(
+      "Federal Reserve Raises Interest Rate by 0.25%"
+    )
+    #expect(result.clickbaitScore < 0.3)
+  }
+}
+```
+
+- [ ] **Performance Benchmark Tests:** Use `XCTMetric` to validate `< 50ms` per headline.
+- [ ] **Edge Case Tests:** Empty strings, non-Latin scripts, extremely long headlines (> 500 chars).
+- [ ] **Integration Tests:** Verify end-to-end pipeline (sync → analysis → persistence → UI query).
+- [ ] Achieve **≥ 80% code coverage** for `AILayer`.
+
 ### Acceptance Criteria
 
 - [ ] Headline analysis completes in **< 50ms per headline** on iPhone 15 Pro.
 - [ ] Zero network calls made during the analysis pipeline.
 - [ ] Credibility badges render correctly on clustered and individual annotations.
+- [ ] All AILayer unit and benchmark tests pass on CI.
 
 ---
 
@@ -367,11 +453,20 @@ ImmersiveSpace(id: "spatial-map") {
 - [ ] Implement an asset caching layer to avoid re-downloading models on repeat views.
 - [ ] Add loading states with animated placeholder entities during model fetch.
 
+#### 4.4 — Phase 4 Testing
+
+- [ ] **ARFeature Unit Tests:** Test entity lifecycle (create → load → destroy) with mock scenes.
+- [ ] **Snapshot Tests:** Capture reference images for AR overlay UI and volumetric views.
+- [ ] **Gesture Tests:** Validate drag, rotate, and scale gesture handlers with synthetic input events.
+- [ ] **Memory Profiling:** Profile VRAM allocation/deallocation during model load/unload cycles.
+- [ ] **visionOS Simulator Tests:** Validate spatial map rendering and window transitions.
+
 ### Acceptance Criteria
 
 - [ ] AR model anchors correctly to a detected surface on iPhone/iPad.
 - [ ] Volumetric window renders USDZ models with correct lighting and shadows on visionOS.
 - [ ] Immersive map space is navigable with gaze + pinch and does not cause simulator/device crashes.
+- [ ] All ARFeature tests pass; zero VRAM leaks detected in profiling.
 
 ---
 
@@ -475,14 +570,79 @@ struct NetworkLayerTests {
 
 ---
 
+## Testing Strategy
+
+Nerve follows a **shift-left testing philosophy** — testing is not a final phase activity but an integral part of every development cycle. Each phase includes dedicated testing deliverables.
+
+### Test Pyramid
+
+```mermaid
+graph TD
+    A["🔺 E2E / UI Tests"] --> B["🔶 Integration Tests"]
+    B --> C["🟢 Unit Tests"]
+
+    style A fill:#ff6b6b,stroke:#333,color:#fff
+    style B fill:#feca57,stroke:#333,color:#333
+    style C fill:#1dd1a1,stroke:#333,color:#fff
+```
+
+| Layer           | Scope                       | Target                        | Runner                            |
+| --------------- | --------------------------- | ----------------------------- | --------------------------------- |
+| **Unit**        | Single module in isolation  | ≥ 80% coverage per module     | Swift Testing (`@Test`, `@Suite`) |
+| **Integration** | Cross-module data flow      | Sync pipeline, DI container   | Swift Testing + in-memory stores  |
+| **UI / E2E**    | Full user journeys          | Critical paths                | XCUITest                          |
+| **Snapshot**    | Visual regression detection | Annotation views, AR overlays | `swift-snapshot-testing`          |
+| **Performance** | Latency & resource budgets  | CPU, GPU, memory, network     | `XCTMetric`, Instruments          |
+
+### Coverage Policy
+
+| Module         | Min Coverage | Rationale                                              |
+| -------------- | ------------ | ------------------------------------------------------ |
+| `Core`         | **90%**      | Foundation layer — bugs cascade everywhere             |
+| `NetworkLayer` | **85%**      | Data integrity is critical                             |
+| `StorageLayer` | **85%**      | Persistence bugs cause data loss                       |
+| `AILayer`      | **80%**      | Model output validation                                |
+| `MapFeature`   | **70%**      | Heavy UI — tested via snapshots + integration          |
+| `ARFeature`    | **60%**      | Hardware-dependent — relies on manual + snapshot tests |
+
+### Mock Infrastructure
+
+All external dependencies are abstracted behind protocols defined in `Core`, enabling deterministic testing:
+
+```swift
+// Core/Protocols/NewsServiceProtocol.swift
+public protocol NewsServiceProtocol: Sendable {
+  func fetchNews(for region: GeoRegion) async throws -> [NewsDTO]
+}
+
+// CoreTests/Mocks/MockNewsService.swift
+final class MockNewsService: NewsServiceProtocol {
+  var stubbedResult: Result<[NewsDTO], Error> = .success([])
+
+  func fetchNews(for region: GeoRegion) async throws -> [NewsDTO] {
+    try stubbedResult.get()
+  }
+}
+```
+
+### Test Execution Matrix
+
+| Platform               | Unit Tests | Integration Tests | UI Tests   | Performance |
+| ---------------------- | ---------- | ----------------- | ---------- | ----------- |
+| **iOS Simulator**      | ✅         | ✅                | ✅         | ✅          |
+| **macOS**              | ✅         | ✅                | ✅         | ✅          |
+| **visionOS Simulator** | ✅         | ✅                | ⚠️ Limited | ⚠️ Limited  |
+
+---
+
 ## Cross-Cutting Concerns
 
 These items span all phases and should be addressed continuously:
 
 ### Code Quality
 
+- [x] Require **Swift Concurrency strict checking** (`SWIFT_STRICT_CONCURRENCY = complete`).
 - [ ] Enforce **SwiftLint** with a shared configuration across all packages.
-- [ ] Require **Swift Concurrency strict checking** (`SWIFT_STRICT_CONCURRENCY = complete`).
 - [ ] Maintain clear documentation via inline `///` doc comments on all public APIs.
 
 ### CI/CD Pipeline
@@ -490,6 +650,8 @@ These items span all phases and should be addressed continuously:
 - [ ] Configure GitHub Actions (or Xcode Cloud) to build & test all three platform targets on every PR.
 - [ ] Automate SwiftLint checks as a CI gate.
 - [ ] Set up code coverage reporting with a **minimum threshold of 80%**.
+- [ ] Run Thread Sanitizer (TSan) on every PR to catch data races early.
+- [ ] Fail the build if any test target drops below its minimum coverage threshold.
 
 ### Accessibility
 
