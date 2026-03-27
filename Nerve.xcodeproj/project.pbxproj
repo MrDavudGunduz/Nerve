@@ -6,6 +6,15 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		E90DF9092F767B9A00630E02 /* Core in Frameworks */ = {isa = PBXBuildFile; productRef = A1000001AABB0001CCDD0001 /* Core */; };
+		E90DF90A2F767B9A00630E02 /* NetworkLayer in Frameworks */ = {isa = PBXBuildFile; productRef = A1000001AABB0002CCDD0002 /* NetworkLayer */; };
+		E90DF90B2F767B9A00630E02 /* StorageLayer in Frameworks */ = {isa = PBXBuildFile; productRef = A1000001AABB0003CCDD0003 /* StorageLayer */; };
+		E90DF90C2F767B9A00630E02 /* MapFeature in Frameworks */ = {isa = PBXBuildFile; productRef = A1000001AABB0004CCDD0004 /* MapFeature */; };
+		E90DF90D2F767B9A00630E02 /* ARFeature in Frameworks */ = {isa = PBXBuildFile; productRef = A1000001AABB0005CCDD0005 /* ARFeature */; };
+		E90DF90E2F767B9A00630E02 /* AILayer in Frameworks */ = {isa = PBXBuildFile; productRef = A1000001AABB0006CCDD0006 /* AILayer */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		E9B241992F73F4C1009F642D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +61,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E90DF90E2F767B9A00630E02 /* AILayer in Frameworks */,
+				E90DF90D2F767B9A00630E02 /* ARFeature in Frameworks */,
+				E90DF90C2F767B9A00630E02 /* MapFeature in Frameworks */,
+				E90DF90B2F767B9A00630E02 /* StorageLayer in Frameworks */,
+				E90DF90A2F767B9A00630E02 /* NetworkLayer in Frameworks */,
+				E90DF9092F767B9A00630E02 /* Core in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -201,8 +216,6 @@
 			);
 			mainGroup = E9B241802F73F4C0009F642D;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
-			productRefGroup = E9B2418A2F73F4C0009F642D /* Products */;
 			packageReferences = (
 				A2000001AABB0001CCDD0001 /* XCLocalSwiftPackageReference "Packages/Core" */,
 				A2000001AABB0002CCDD0002 /* XCLocalSwiftPackageReference "Packages/NetworkLayer" */,
@@ -211,6 +224,8 @@
 				A2000001AABB0005CCDD0005 /* XCLocalSwiftPackageReference "Packages/ARFeature" */,
 				A2000001AABB0006CCDD0006 /* XCLocalSwiftPackageReference "Packages/AILayer" */,
 			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = E9B2418A2F73F4C0009F642D /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
