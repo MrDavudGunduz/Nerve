@@ -92,6 +92,9 @@ public actor DependencyContainer {
 
   private var registrations: [ServiceKey: Registration] = [:]
 
+  /// Keys currently being resolved — used to detect circular dependencies.
+  private var resolvingKeys: Set<ServiceKey> = []
+
   // MARK: - Init
 
   /// Creates a new, empty dependency container.
@@ -141,9 +144,17 @@ public actor DependencyContainer {
   ) async throws -> T {
     let key = ServiceKey(type, name: name)
 
+    // Circular dependency detection
+    guard !resolvingKeys.contains(key) else {
+      throw DependencyError.circularDependency(String(describing: type))
+    }
+
     guard var registration = registrations[key] else {
       throw DependencyError.notRegistered(String(describing: type))
     }
+
+    resolvingKeys.insert(key)
+    defer { resolvingKeys.remove(key) }
 
     switch registration.lifetime {
 

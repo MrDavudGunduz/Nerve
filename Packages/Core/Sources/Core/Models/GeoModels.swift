@@ -2,7 +2,7 @@
 //  GeoModels.swift
 //  Core
 //
-//  Created by Davud Gunduz on 26.03.2026.
+//  Created by Davud Gunduz on 25.03.2026.
 //
 
 import Foundation
@@ -14,25 +14,38 @@ import Foundation
 /// This is the canonical representation of a point on Earth used
 /// throughout Nerve. It is intentionally decoupled from CoreLocation's
 /// `CLLocationCoordinate2D` to keep `Core` free of platform frameworks.
+///
+/// Uses a failable initializer to gracefully reject invalid values
+/// instead of crashing at runtime.
+///
+/// ```swift
+/// guard let coord = GeoCoordinate(latitude: 41.0, longitude: 29.0) else {
+///   throw NerveError.location(message: "Invalid coordinate")
+/// }
+/// ```
 public struct GeoCoordinate: Sendable, Codable, Hashable {
-    
+
   /// Latitude in decimal degrees (−90 … +90).
-    public let latitude: Double
+  public let latitude: Double
 
   /// Longitude in decimal degrees (−180 … +180).
-    public let longitude: Double
+  public let longitude: Double
 
   /// Creates a coordinate with the given latitude and longitude.
-    
-    public init(latitude: Double, longitude: Double) {
-        
-      precondition((-90...90).contains(latitude), "Latitude must be -90...+90")
-      precondition((-180...180).contains(longitude), "Longitude must be -180...+180")
-        
-      self.latitude = latitude
-      self.longitude = longitude
-    }
+  ///
+  /// Returns `nil` if either value is outside the valid geographic range.
+  ///
+  /// - Parameters:
+  ///   - latitude: Latitude in decimal degrees (−90 … +90).
+  ///   - longitude: Longitude in decimal degrees (−180 … +180).
+  public init?(latitude: Double, longitude: Double) {
+    guard (-90...90).contains(latitude),
+      (-180...180).contains(longitude)
+    else { return nil }
 
+    self.latitude = latitude
+    self.longitude = longitude
+  }
 }
 
 // MARK: - GeoRegion
@@ -49,7 +62,14 @@ public struct GeoRegion: Sendable, Codable, Hashable {
   public let radiusMeters: Double
 
   /// Creates a region with the given center and radius.
-  public init(center: GeoCoordinate, radiusMeters: Double) {
+  ///
+  /// Returns `nil` if `radiusMeters` is negative.
+  ///
+  /// - Parameters:
+  ///   - center: The center point of the region.
+  ///   - radiusMeters: The radius in meters (must be ≥ 0).
+  public init?(center: GeoCoordinate, radiusMeters: Double) {
+    guard radiusMeters >= 0 else { return nil }
     self.center = center
     self.radiusMeters = radiusMeters
   }

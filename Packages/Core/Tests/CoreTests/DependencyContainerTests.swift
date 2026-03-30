@@ -3,42 +3,6 @@ import Testing
 
 @testable import Core
 
-// MARK: - Test Helpers
-
-/// A mock service conforming to `Sendable` for DI container testing.
-protocol MockServiceProtocol: Sendable {
-  var identifier: String { get }
-}
-
-/// A concrete mock service used in registration/resolution tests.
-struct MockService: MockServiceProtocol {
-  let identifier: String
-
-  init(identifier: String = "default") {
-    self.identifier = identifier
-  }
-}
-
-/// Thread-safe counter for transient service tests.
-actor Counter {
-  private var value = 0
-  func increment() -> Int {
-    value += 1
-    return value
-  }
-}
-
-/// A second mock protocol to test multiple registrations.
-protocol AnotherMockProtocol: Sendable {
-  var value: Int { get }
-}
-
-struct AnotherMockService: AnotherMockProtocol {
-  let value: Int
-}
-
-// MARK: - DependencyContainer Tests
-
 @Suite("DependencyContainer Tests")
 struct DependencyContainerTests {
 
@@ -57,7 +21,6 @@ struct DependencyContainerTests {
 
     #expect(first.identifier == "singleton-1")
     #expect(second.identifier == "singleton-1")
-    // Singleton: both calls return the same cached instance
     #expect(first.identifier == second.identifier)
   }
 
@@ -73,7 +36,6 @@ struct DependencyContainerTests {
     let first = try await container.resolve(MockServiceProtocol.self)
     let second = try await container.resolve(MockServiceProtocol.self)
 
-    // Transient: factory called each time, producing unique instances
     #expect(first.identifier != second.identifier)
   }
 
@@ -113,7 +75,6 @@ struct DependencyContainerTests {
     let original = try await container.resolve(MockServiceProtocol.self)
     #expect(original.identifier == "original")
 
-    // Override with new factory
     await container.register(MockServiceProtocol.self) {
       MockService(identifier: "overridden")
     }
@@ -169,7 +130,6 @@ struct DependencyContainerTests {
     let first = try await container.resolve(MockServiceProtocol.self)
     let second = try await container.resolve(MockServiceProtocol.self)
 
-    // Scoped: same instance returned while scope is valid
     #expect(first.identifier == second.identifier)
     #expect(first.identifier == "session-user")
   }
@@ -186,7 +146,6 @@ struct DependencyContainerTests {
     let first = try await container.resolve(MockServiceProtocol.self)
     #expect(first.identifier == "session-1")
 
-    // Invalidate scope — next resolve should create a new instance
     await container.invalidateScope("auth")
 
     let second = try await container.resolve(MockServiceProtocol.self)
@@ -226,123 +185,5 @@ struct DependencyContainerTests {
     #expect(defaultService.identifier == "default")
     #expect(specialService.identifier == "special")
     #expect(await container.registrationCount == 2)
-  }
-}
-
-// MARK: - Domain Model Tests
-
-@Suite("Domain Model Tests")
-struct DomainModelTests {
-
-  @Test("NewsItem is correctly initialized with all fields")
-  func newsItemInit() {
-    let coordinate = GeoCoordinate(latitude: 41.0082, longitude: 28.9784)
-    let item = NewsItem(
-      id: "test-1",
-      headline: "Breaking News",
-      summary: "A test summary",
-      source: "Test Source",
-      category: .technology,
-      coordinate: coordinate,
-      publishedAt: Date(timeIntervalSince1970: 0)
-    )
-
-    #expect(item.id == "test-1")
-    #expect(item.headline == "Breaking News")
-    #expect(item.category == .technology)
-    #expect(item.coordinate == coordinate)
-    #expect(item.analysis == nil)
-  }
-
-  @Test("HeadlineAnalysis credibility label boundaries")
-  func credibilityLabels() {
-    let verified = HeadlineAnalysis(
-      clickbaitScore: 0.1, sentiment: .neutral, confidence: 0.9
-    )
-    #expect(verified.credibilityLabel == .verified)
-
-    let caution = HeadlineAnalysis(
-      clickbaitScore: 0.5, sentiment: .neutral, confidence: 0.8
-    )
-    #expect(caution.credibilityLabel == .caution)
-
-    let clickbait = HeadlineAnalysis(
-      clickbaitScore: 0.85, sentiment: .negative, confidence: 0.95
-    )
-    #expect(clickbait.credibilityLabel == .clickbait)
-  }
-
-  @Test("GeoRegion equality")
-  func geoRegionEquality() {
-    let region1 = GeoRegion(
-      center: GeoCoordinate(latitude: 41.0, longitude: 29.0),
-      radiusMeters: 1000
-    )
-    let region2 = GeoRegion(
-      center: GeoCoordinate(latitude: 41.0, longitude: 29.0),
-      radiusMeters: 1000
-    )
-
-    #expect(region1 == region2)
-  }
-
-  @Test("NewsCategory has expected case count")
-  func newsCategoryCases() {
-    #expect(NewsCategory.allCases.count == 9)
-  }
-
-  @Test("Sentiment has all expected cases")
-  func sentimentCases() {
-    #expect(Sentiment.allCases.count == 3)
-    #expect(Sentiment.allCases.contains(.positive))
-    #expect(Sentiment.allCases.contains(.neutral))
-    #expect(Sentiment.allCases.contains(.negative))
-  }
-}
-
-// MARK: - Core Module Tests
-
-@Suite("Core Module Tests")
-struct CoreModuleTests {
-
-  @Test("Core module version is defined")
-  func moduleVersion() {
-    #expect(!Core.version.isEmpty)
-  }
-
-  @Test("Core.container is accessible")
-  func sharedContainer() async {
-    let isRegistered = await Core.container.isRegistered(MockServiceProtocol.self)
-    #expect(isRegistered == false)
-  }
-}
-
-// MARK: - DependencyError Tests
-
-@Suite("DependencyError Tests")
-struct DependencyErrorTests {
-
-  @Test("notRegistered has descriptive message")
-  func notRegisteredDescription() {
-    let error = DependencyError.notRegistered("MockService")
-    #expect(error.description.contains("MockService"))
-    #expect(error.description.contains("No registration found"))
-  }
-
-  @Test("typeMismatch has descriptive message")
-  func typeMismatchDescription() {
-    let error = DependencyError.typeMismatch(expected: "String", actual: "Int")
-    #expect(error.description.contains("String"))
-    #expect(error.description.contains("Int"))
-  }
-
-  @Test("DependencyError conforms to Equatable")
-  func equatable() {
-    let a = DependencyError.notRegistered("Foo")
-    let b = DependencyError.notRegistered("Foo")
-    let c = DependencyError.notRegistered("Bar")
-
-    #expect(a == b)
-    #expect(a != c)
   }
 }

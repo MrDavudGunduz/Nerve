@@ -93,10 +93,10 @@ let package = Package(
 
 #### 1.3 — Dependency Injection & UI Isolation
 
-- [ ] Implement a lightweight **DI Container** in `Core` (protocol-based, no third-party frameworks).
-- [ ] Define service protocols (e.g., `NewsServiceProtocol`, `LocationServiceProtocol`, `StorageServiceProtocol`) in `Core`.
-- [ ] Ensure **zero UIKit/SwiftUI imports** in `Core`, `NetworkLayer`, `StorageLayer`, and `AILayer`.
-- [ ] Wire up the container at the app-entry point (`NerveApp.swift`) using `@Environment` for SwiftUI injection.
+- [x] Implement a lightweight **DI Container** in `Core` (protocol-based, no third-party frameworks).
+- [x] Define service protocols (e.g., `NewsServiceProtocol`, `LocationServiceProtocol`, `StorageServiceProtocol`) in `Core`.
+- [x] Ensure **zero UIKit/SwiftUI imports** in `Core`, `NetworkLayer`, `StorageLayer`, and `AILayer`.
+- [x] Wire up the container at the app-entry point (`NerveApp.swift`) using `@Environment` for SwiftUI injection.
 
 #### 1.4 — Phase 1 Testing
 

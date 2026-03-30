@@ -11,6 +11,8 @@ public enum DependencyError: Error, Sendable, Equatable {
   case notRegistered(String)
   /// The factory produced an instance of an unexpected type.
   case typeMismatch(expected: String, actual: String)
+  /// A circular dependency was detected during resolution.
+  case circularDependency(String)
 }
 
 extension DependencyError: CustomStringConvertible {
@@ -21,6 +23,9 @@ extension DependencyError: CustomStringConvertible {
         + "Did you forget to call container.register(\(type).self, ...)?"
     case .typeMismatch(let expected, let actual):
       return "DependencyError: Expected '\(expected)' but factory produced '\(actual)'."
+    case .circularDependency(let type):
+      return "DependencyError: Circular dependency detected while resolving '\(type)'. "
+        + "Check that the factory for '\(type)' does not directly or indirectly resolve itself."
     }
   }
 }
