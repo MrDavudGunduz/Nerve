@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/Platform-iOS_17+-000000?style=flat&logo=apple&logoColor=white" />
   <img src="https://img.shields.io/badge/Platform-macOS_14+-000000?style=flat&logo=apple&logoColor=white" />
   <img src="https://img.shields.io/badge/Platform-visionOS_1+-000000?style=flat&logo=apple&logoColor=white" />
-  <img src="https://img.shields.io/badge/Swift-5.9+-F05138?style=flat&logo=swift&logoColor=white" />
+  <img src="https://img.shields.io/badge/Swift-6.0-F05138?style=flat&logo=swift&logoColor=white" />
   <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat" />
 </p>
 
@@ -114,7 +114,7 @@ flowchart LR
 
 | Category         | Technology                                          |
 | ---------------- | --------------------------------------------------- |
-| **Language**     | Swift 5.9+                                          |
+| **Language**     | Swift 6.0 (Strict Concurrency)                      |
 | **UI Framework** | SwiftUI                                             |
 | **Persistence**  | SwiftData                                           |
 | **Maps**         | MapKit, CoreLocation                                |
@@ -134,8 +134,8 @@ flowchart LR
 
 | Requirement                | Minimum                                      |
 | -------------------------- | -------------------------------------------- |
-| Xcode                      | 15.0+                                        |
-| Swift                      | 5.9+                                         |
+| Xcode                      | 16.0+                                        |
+| Swift                      | 6.0                                          |
 | iOS Deployment Target      | 17.0                                         |
 | macOS Deployment Target    | 14.0                                         |
 | visionOS Deployment Target | 1.0                                          |
@@ -177,15 +177,15 @@ Press `⌘R` to build and run.
 ### 5. Run Tests
 
 ```bash
-# Unit tests (all platforms)
+# SPM package tests (all 6 packages)
+for pkg in Core NetworkLayer StorageLayer MapFeature ARFeature AILayer; do
+  swift test --package-path Packages/$pkg
+done
+
+# App target tests (via Xcode)
 xcodebuild test \
   -scheme Nerve \
-  -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
-
-# UI tests
-xcodebuild test \
-  -scheme NerveUITests \
-  -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro'
 ```
 
 ---
@@ -194,47 +194,49 @@ xcodebuild test \
 
 ```
 Nerve/
-├── Nerve/                          # Main app target
-│   ├── NerveApp.swift              # App entry point & DI configuration
-│   ├── ContentView.swift           # Root view with navigation
-│   ├── Assets.xcassets/            # App icons, colors, images
-│   └── ...
+├── Nerve/                              # Main app target
+│   ├── NerveApp.swift                  # App entry point, DI & ModelContainer config
+│   ├── ContentView.swift               # Platform-adaptive root view
+│   ├── DependencyContainerEnvironment  # SwiftUI EnvironmentKey for DI
+│   └── Assets.xcassets/                # App icons, colors, images
 │
 ├── Packages/
-│   ├── Core/                       # Shared foundation
-│   │   ├── Models/                 # Domain models
-│   │   ├── Protocols/              # Service contracts
-│   │   └── DI/                     # Dependency injection container
+│   ├── Core/                           # Shared foundation (zero UI deps)
+│   │   └── Sources/Core/
+│   │       ├── Core.swift              # Module namespace & version
+│   │       ├── DI/
+│   │       │   ├── DependencyContainer  # Actor-based DI container
+│   │       │   ├── DependencyError      # Resolution error types
+│   │       │   └── ServiceKey           # Type-erased registry key
+│   │       ├── Models/
+│   │       │   ├── NewsItem             # Canonical news article model
+│   │       │   ├── GeoModels            # GeoCoordinate & GeoRegion
+│   │       │   ├── HeadlineAnalysis     # AI analysis result model
+│   │       │   └── NerveError           # Unified error type + ErrorContext
+│   │       └── Protocols/
+│   │           ├── NewsServiceProtocol
+│   │           ├── LocationServiceProtocol
+│   │           ├── StorageServiceProtocol
+│   │           ├── AIAnalysisServiceProtocol
+│   │           └── ImageServiceProtocol
 │   │
-│   ├── NetworkLayer/               # Networking
-│   │   ├── APIClient/              # URLSession-based client
-│   │   ├── DTOs/                   # Data transfer objects
-│   │   └── Interceptors/          # Auth, logging, retry logic
-│   │
-│   ├── StorageLayer/               # Persistence
-│   │   ├── Schemas/                # SwiftData @Model definitions
-│   │   ├── Actors/                 # Thread-safe persistence actors
-│   │   └── Migrations/            # Schema versioning
-│   │
-│   ├── MapFeature/                 # Map module
-│   │   ├── Views/                  # Map UI components
-│   │   ├── Clustering/             # Quad-tree annotation clustering
-│   │   └── ViewModels/             # Map state management
-│   │
-│   ├── ARFeature/                  # AR & 3D module
-│   │   ├── ARViews/                # RealityKit view wrappers
-│   │   ├── Models/                 # USDZ asset management
-│   │   └── Spatial/                # visionOS volumes & spaces
-│   │
-│   └── AILayer/                    # Intelligence module
-│       ├── Models/                 # CoreML model wrappers
-│       ├── Pipeline/               # Batch analysis engine
-│       └── Scoring/                # Credibility scoring logic
+│   ├── NetworkLayer/                   # API client (URLSession-based)
+│   ├── StorageLayer/                   # SwiftData persistence
+│   │   └── Sources/StorageLayer/
+│   │       ├── StorageLayer.swift       # Module namespace
+│   │       └── ModelRegistry.swift      # Centralized @Model registry
+│   ├── MapFeature/                     # MapKit map module
+│   ├── ARFeature/                      # RealityKit / ARKit module
+│   └── AILayer/                        # CoreML intelligence module
 │
-├── NerveTests/                     # Unit tests
-├── NerveUITests/                   # UI automation tests
-├── DEVELOPMENT_ROADMAP.md          # Detailed development plan
-└── README.md                       # ← You are here
+├── NerveTests/                         # App-level integration tests
+├── NerveUITests/                       # UI automation tests
+├── docs/ADRs/                          # Architecture Decision Records
+├── DEVELOPMENT_ROADMAP.md              # 5-phase implementation plan
+├── CHANGELOG.md                        # Version history
+├── CONTRIBUTING.md                     # Contribution guidelines
+├── LICENSE                             # MIT License
+└── README.md                           # ← You are here
 ```
 
 ---

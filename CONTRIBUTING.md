@@ -1,6 +1,6 @@
 # Contributing to Nerve
 
-> **Last Updated:** March 25, 2026  
+> **Last Updated:** March 31, 2026  
 > **Project Overview:** See [README.md](README.md)
 
 ---
@@ -15,8 +15,8 @@ Thank you for your interest in contributing to Nerve. This document defines the 
 
 | Requirement                | Minimum |
 | -------------------------- | ------- |
-| Xcode                      | 15.0+   |
-| Swift                      | 5.9+    |
+| Xcode                      | 16.0+   |
+| Swift                      | 6.0     |
 | iOS Deployment Target      | 17.0    |
 | macOS Deployment Target    | 14.0    |
 | visionOS Deployment Target | 1.0     |
@@ -117,9 +117,17 @@ Closes #42
    git rebase origin/main
    ```
 2. Run all tests locally:
+
    ```bash
-   xcodebuild test -scheme Nerve -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
+   # SPM package tests
+   for pkg in Core NetworkLayer StorageLayer MapFeature ARFeature AILayer; do
+     swift test --package-path Packages/$pkg
+   done
+
+   # App target tests
+   xcodebuild test -scheme Nerve -destination 'platform=iOS Simulator,name=iPhone 16 Pro'
    ```
+
 3. Run SwiftLint:
    ```bash
    swiftlint lint --strict
@@ -183,14 +191,14 @@ Closes #42
 
 ### Coverage Targets
 
-| Module         | Framework               | Minimum Coverage    |
-| -------------- | ----------------------- | ------------------- |
-| `Core`         | Swift Testing (`@Test`) | 80%                 |
-| `NetworkLayer` | Swift Testing (`@Test`) | 80%                 |
-| `StorageLayer` | Swift Testing (`@Test`) | 80%                 |
-| `AILayer`      | Swift Testing (`@Test`) | 80%                 |
-| `MapFeature`   | XCUITest                | Critical user flows |
-| `ARFeature`    | XCUITest                | Critical user flows |
+| Module         | Framework               | Minimum Coverage |
+| -------------- | ----------------------- | ---------------- |
+| `Core`         | Swift Testing (`@Test`) | 90%              |
+| `NetworkLayer` | Swift Testing (`@Test`) | 85%              |
+| `StorageLayer` | Swift Testing (`@Test`) | 85%              |
+| `AILayer`      | Swift Testing (`@Test`) | 80%              |
+| `MapFeature`   | Swift Testing (`@Test`) | 70%              |
+| `ARFeature`    | Swift Testing (`@Test`) | 60%              |
 
 ### Rules
 

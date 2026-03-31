@@ -144,21 +144,14 @@ public actor DependencyContainer {
   ) async throws -> T {
     let key = ServiceKey(type, name: name)
 
-    // Circular dependency detection
-    guard !resolvingKeys.contains(key) else {
-      throw DependencyError.circularDependency(String(describing: type))
-    }
-
-    guard var registration = registrations[key] else {
+    guard let registration = registrations[key] else {
       throw DependencyError.notRegistered(String(describing: type))
     }
-
-    resolvingKeys.insert(key)
-    defer { resolvingKeys.remove(key) }
 
     switch registration.lifetime {
 
     case .singleton, .scoped:
+      // 1. Return cached instance immediately if available.
       if let cached = registration.cachedInstance {
         guard let instance = cached as? T else {
           throw DependencyError.typeMismatch(
@@ -169,18 +162,45 @@ public actor DependencyContainer {
         return instance
       }
 
-      let instance = try await registration.factory()
+      // 2. Call the factory. Note: we intentionally do NOT use
+      //    `resolvingKeys` here for singleton/scoped lifetimes.
+      //    With actor reentrancy, a concurrent resolve arriving
+      //    during the `await` below is a legitimate parallel call,
+      //    not a circular dependency. The double-check in step 4
+      //    ensures true singleton semantics by returning the first
+      //    cached value when multiple factories race.
+      let instance: any Sendable
+      instance = try await registration.factory()
+
+      // 3. Type-check the factory output.
       guard let typed = instance as? T else {
         throw DependencyError.typeMismatch(
           expected: String(describing: type),
           actual: String(describing: Swift.type(of: instance))
         )
       }
-      registration.cachedInstance = typed
-      registrations[key] = registration
+
+      // 4. Double-check after await: another concurrent resolve may
+      //    have populated the cache during the suspension point above.
+      //    If so, return the existing cached value for true singleton
+      //    semantics. Otherwise, cache our result.
+      if let alreadyCached = registrations[key]?.cachedInstance,
+        let existing = alreadyCached as? T
+      {
+        return existing
+      }
+
+      registrations[key]?.cachedInstance = typed
       return typed
 
     case .transient:
+      // Circular dependency detection for transient services.
+      guard !resolvingKeys.contains(key) else {
+        throw DependencyError.circularDependency(String(describing: type))
+      }
+      resolvingKeys.insert(key)
+      defer { resolvingKeys.remove(key) }
+
       let instance = try await registration.factory()
       guard let typed = instance as? T else {
         throw DependencyError.typeMismatch(

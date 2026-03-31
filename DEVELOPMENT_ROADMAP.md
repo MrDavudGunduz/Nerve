@@ -1,7 +1,7 @@
 # Nerve — Development Roadmap
 
 > **Timeline:** 5 Weeks  
-> **Last Updated:** March 26, 2026  
+> **Last Updated:** March 31, 2026  
 > **Project Overview:** See [README.md](README.md)
 
 ---
@@ -100,10 +100,10 @@ let package = Package(
 
 #### 1.4 — Phase 1 Testing
 
-- [ ] Configure Swift Testing (`@Suite`, `@Test`) for all 6 package test targets.
-- [ ] Write unit tests for DI Container resolution and circular dependency detection.
-- [ ] Verify service protocol conformance with compile-time checks.
-- [ ] Validate all packages compile and test independently on all three platforms:
+- [x] Configure Swift Testing (`@Suite`, `@Test`) for all 6 package test targets.
+- [x] Write unit tests for DI Container resolution and circular dependency detection.
+- [x] Verify service protocol conformance with compile-time checks.
+- [x] Validate all packages compile and test independently on all three platforms:
 
 ```bash
 # CI Verification Script
@@ -117,7 +117,7 @@ done
 - [x] All six packages compile successfully for iOS, macOS, and visionOS.
 - [x] `Core` module has no UI dependencies.
 - [x] A trivial "Hello World" view renders on all three platforms using shared logic from `Core`.
-- [ ] All package test targets pass with `swift test`.
+- [x] All package test targets pass with `swift test`.
 
 ---
 
@@ -612,14 +612,14 @@ All external dependencies are abstracted behind protocols defined in `Core`, ena
 ```swift
 // Core/Protocols/NewsServiceProtocol.swift
 public protocol NewsServiceProtocol: Sendable {
-  func fetchNews(for region: GeoRegion) async throws -> [NewsDTO]
+  func fetchNews(for region: GeoRegion) async throws -> [NewsItem]
 }
 
 // CoreTests/Mocks/MockNewsService.swift
 final class MockNewsService: NewsServiceProtocol {
-  var stubbedResult: Result<[NewsDTO], Error> = .success([])
+  var stubbedResult: Result<[NewsItem], Error> = .success([])
 
-  func fetchNews(for region: GeoRegion) async throws -> [NewsDTO] {
+  func fetchNews(for region: GeoRegion) async throws -> [NewsItem] {
     try stubbedResult.get()
   }
 }

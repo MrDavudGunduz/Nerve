@@ -23,7 +23,7 @@ import Foundation
 ///   throw NerveError.location(message: "Invalid coordinate")
 /// }
 /// ```
-public struct GeoCoordinate: Sendable, Codable, Hashable {
+public struct GeoCoordinate: Sendable, Hashable {
 
   /// Latitude in decimal degrees (−90 … +90).
   public let latitude: Double
@@ -45,6 +45,41 @@ public struct GeoCoordinate: Sendable, Codable, Hashable {
 
     self.latitude = latitude
     self.longitude = longitude
+  }
+}
+
+// MARK: - Codable
+
+extension GeoCoordinate: Codable {
+
+  private enum CodingKeys: String, CodingKey {
+    case latitude
+    case longitude
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let lat = try container.decode(Double.self, forKey: .latitude)
+    let lon = try container.decode(Double.self, forKey: .longitude)
+
+    guard let coordinate = GeoCoordinate(latitude: lat, longitude: lon) else {
+      throw DecodingError.dataCorrupted(
+        DecodingError.Context(
+          codingPath: container.codingPath,
+          debugDescription:
+            "Invalid coordinate: latitude \(lat) must be in −90…+90, "
+            + "longitude \(lon) must be in −180…+180."
+        )
+      )
+    }
+
+    self = coordinate
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(latitude, forKey: .latitude)
+    try container.encode(longitude, forKey: .longitude)
   }
 }
 

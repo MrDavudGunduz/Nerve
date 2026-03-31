@@ -10,9 +10,9 @@ struct CircularDependencyTests {
 
   let container = DependencyContainer()
 
-  @Test("Detects self-referencing circular dependency")
+  @Test("Detects self-referencing circular dependency for transient lifetime")
   func selfReferencing() async throws {
-    await container.register(MockServiceProtocol.self) { [container] in
+    await container.register(MockServiceProtocol.self, lifetime: .transient) { [container] in
       _ = try await container.resolve(MockServiceProtocol.self)
       return MockService(identifier: "should-not-reach")
     }
@@ -65,6 +65,25 @@ struct ConcurrentResolutionTests {
 
     #expect(results.count == 10)
     #expect(results.allSatisfy { $0 == "concurrent-singleton" })
+  }
+
+  @Test("Singleton resolved after first creation returns cached instance")
+  func singletonDoubleCheckAfterAwait() async throws {
+    let counter = Counter()
+
+    await container.register(MockServiceProtocol.self, lifetime: .singleton) {
+      let count = await counter.increment()
+      return MockService(identifier: "created-\(count)")
+    }
+
+    // First resolve: creates the instance
+    let first = try await container.resolve(MockServiceProtocol.self)
+    #expect(first.identifier == "created-1")
+
+    // Second resolve: should return cached instance, not call factory again
+    let second = try await container.resolve(MockServiceProtocol.self)
+    #expect(second.identifier == "created-1")
+    #expect(first.identifier == second.identifier)
   }
 }
 

@@ -6,6 +6,7 @@
 //
 
 import Core
+import OSLog
 import SwiftUI
 
 // MARK: - Environment Key
@@ -37,17 +38,45 @@ private struct DependencyContainerKey: EnvironmentKey {
   static let defaultValue = DependencyContainer()
 }
 
+/// Tracks whether a container was explicitly injected via
+/// `.environment(\.dependencyContainer, ...)`.
+private struct DependencyContainerInjectedKey: EnvironmentKey {
+  static let defaultValue = false
+}
+
+/// Logger for environment-related diagnostics.
+private let environmentLogger = Logger(
+  subsystem: Bundle.main.bundleIdentifier ?? "com.davudgunduz.Nerve",
+  category: "Environment"
+)
+
 // MARK: - EnvironmentValues Extension
 
 extension EnvironmentValues {
 
   /// The app-wide dependency container available to all SwiftUI views.
   ///
-  /// - Note: Inject via `.environment(\.dependencyContainer, container)` at the
-  ///   root of the view hierarchy. If not injected, a fresh empty container
-  ///   is provided as the default.
+  /// - Important: Inject via `.environment(\.dependencyContainer, container)` at the
+  ///   root of the view hierarchy. In `DEBUG` builds, accessing this property
+  ///   without prior injection logs a warning to help catch configuration
+  ///   mistakes early.
   var dependencyContainer: DependencyContainer {
-    get { self[DependencyContainerKey.self] }
-    set { self[DependencyContainerKey.self] = newValue }
+    get {
+      #if DEBUG
+        if !self[DependencyContainerInjectedKey.self] {
+          environmentLogger.warning(
+            """
+            DependencyContainer accessed but never injected. \
+            Add .environment(\\.dependencyContainer, container) to the root view hierarchy.
+            """
+          )
+        }
+      #endif
+      return self[DependencyContainerKey.self]
+    }
+    set {
+      self[DependencyContainerKey.self] = newValue
+      self[DependencyContainerInjectedKey.self] = true
+    }
   }
 }

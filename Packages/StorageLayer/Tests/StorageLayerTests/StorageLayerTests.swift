@@ -22,7 +22,7 @@ struct StubStorageService: StorageServiceProtocol {
 
   func saveNews(_ items: [NewsItem]) async throws {}
 
-  func fetchNews(in region: GeoRegion?) async throws -> [NewsItem] {
+  func fetchNews(in region: GeoRegion?, limit: Int?, offset: Int?) async throws -> [NewsItem] {
     []
   }
 
@@ -45,7 +45,7 @@ struct StorageLayerProtocolTests {
     }
 
     let service = try await container.resolve(StorageServiceProtocol.self)
-    let results = try await service.fetchNews(in: nil)
+    let results = try await service.fetchNews(in: nil, limit: nil, offset: nil)
     #expect(results.isEmpty)
   }
 

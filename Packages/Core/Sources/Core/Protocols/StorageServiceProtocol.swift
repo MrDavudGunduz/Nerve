@@ -20,11 +20,19 @@ public protocol StorageServiceProtocol: Sendable {
   /// - Parameter items: The news items to save.
   func saveNews(_ items: [NewsItem]) async throws
 
-  /// Fetches all stored news items within the given region.
+  /// Fetches stored news items, optionally filtered by region and paginated.
   ///
-  /// - Parameter region: Optional region to filter results.
+  /// - Parameters:
+  ///   - region: Optional region to filter results. Pass `nil` to fetch all.
+  ///   - limit: Maximum number of items to return. Pass `nil` for no limit.
+  ///   - offset: Number of items to skip before returning results.
+  ///     Pass `nil` or `0` to start from the beginning.
   /// - Returns: An array of persisted ``NewsItem`` instances.
-  func fetchNews(in region: GeoRegion?) async throws -> [NewsItem]
+  func fetchNews(
+    in region: GeoRegion?,
+    limit: Int?,
+    offset: Int?
+  ) async throws -> [NewsItem]
 
   /// Deletes a news item by its unique identifier.
   ///
