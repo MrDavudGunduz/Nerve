@@ -36,9 +36,11 @@ public protocol ClusteringServiceProtocol: Sendable {
   ///   - zoomLevel: The current zoom level (0–20, decimal).
   ///     Higher values = more zoomed in.
   /// - Returns: An array of ``NewsCluster``s covering the visible region.
+  /// - Throws: ``NerveError`` if the clustering engine encounters an internal
+  ///   error (e.g., out-of-memory or malformed input data).
   func cluster(
     items: [NewsItem],
     in region: GeoRegion,
     zoomLevel: Double
-  ) async -> [NewsCluster]
+  ) async throws -> [NewsCluster]
 }

@@ -5,86 +5,111 @@
 //  Created by Davud Gunduz on 25.03.2026.
 //
 
+import Core
+import MapFeature
 import SwiftUI
+
+// MARK: - ContentView
 
 /// The root view of the Nerve application.
 ///
-/// Provides platform-adaptive navigation that serves as the composition root
-/// for all feature modules. On iOS, it presents a tab-based interface.
-/// On macOS, it uses a sidebar navigation. On visionOS, it adapts to
-/// spatial computing conventions.
+/// Uses a tab-based navigation structure on iOS/visionOS and a
+/// sidebar layout on macOS. The **Map** tab is the primary entry point,
+/// rendered by ``MapFeature/NerveMapView``.
 struct ContentView: View {
+
+  @Environment(\.dependencyContainer) private var container
 
   // MARK: - Body
 
   var body: some View {
-    NavigationStack {
-      VStack(spacing: 24) {
-        Spacer()
+    #if os(iOS) || os(visionOS)
+      tabView
+    #elseif os(macOS)
+      sidebarView
+    #endif
+  }
 
-        Image(systemName: "globe.europe.africa.fill")
-          .font(.system(size: 80))
-          .foregroundStyle(.tint)
-          .symbolEffect(.pulse, options: .repeating)
+  // MARK: - Tab Layout (iOS / visionOS)
 
-        Text("Nerve")
-          .font(.largeTitle)
-          .fontWeight(.bold)
+  #if os(iOS) || os(visionOS)
+    private var tabView: some View {
+      TabView {
+        NerveMapView()
+          .tabItem {
+            Label("Map", systemImage: "map.fill")
+          }
+          .tag(Tab.map)
 
-        Text("Spatial News Intelligence")
-          .font(.title3)
-          .foregroundStyle(.secondary)
+        placeholderTab(
+          title: "Headlines",
+          icon: "newspaper.fill",
+          tag: .headlines
+        )
 
-        platformInfoView
+        placeholderTab(
+          title: "Insights",
+          icon: "chart.bar.xaxis",
+          tag: .insights
+        )
 
-        Spacer()
+        placeholderTab(
+          title: "Settings",
+          icon: "gearshape.fill",
+          tag: .settings
+        )
       }
-      .padding()
-      .navigationTitle("Nerve")
-      #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-      #endif
     }
-  }
+  #endif
 
-  // MARK: - Platform Info
+  // MARK: - Sidebar Layout (macOS)
 
-  /// Displays the current platform for verification purposes.
-  private var platformInfoView: some View {
-    HStack(spacing: 8) {
-      Image(systemName: platformIcon)
-      Text(platformName)
+  #if os(macOS)
+    private var sidebarView: some View {
+      NavigationSplitView {
+        List {
+          Label("Map", systemImage: "map.fill")
+          Label("Headlines", systemImage: "newspaper.fill")
+          Label("Insights", systemImage: "chart.bar.xaxis")
+          Label("Settings", systemImage: "gearshape.fill")
+        }
+        .navigationTitle("Nerve")
+      } detail: {
+        NerveMapView()
+      }
     }
-    .font(.subheadline)
-    .foregroundStyle(.tertiary)
-    .padding(.horizontal, 16)
-    .padding(.vertical, 8)
-    .background(.quaternary, in: Capsule())
-  }
+  #endif
 
-  private var platformName: String {
-    #if os(iOS)
-      "iOS"
-    #elseif os(macOS)
-      "macOS"
-    #elseif os(visionOS)
-      "visionOS"
-    #else
-      "Unknown"
-    #endif
-  }
+  // MARK: - Helpers
 
-  private var platformIcon: String {
-    #if os(iOS)
-      "iphone"
-    #elseif os(macOS)
-      "macbook"
-    #elseif os(visionOS)
-      "visionpro"
-    #else
-      "questionmark.circle"
-    #endif
-  }
+  #if os(iOS) || os(visionOS)
+    private func placeholderTab(
+      title: String,
+      icon: String,
+      tag: Tab
+    ) -> some View {
+      VStack(spacing: 16) {
+        Image(systemName: icon)
+          .font(.system(size: 48))
+          .foregroundStyle(.tertiary)
+        Text(title)
+          .font(.title2)
+          .foregroundStyle(.secondary)
+        Text("Coming soon")
+          .font(.subheadline)
+          .foregroundStyle(.tertiary)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .tabItem { Label(title, systemImage: icon) }
+      .tag(tag)
+    }
+  #endif
+}
+
+// MARK: - Tab
+
+private enum Tab: Hashable {
+  case map, headlines, insights, settings
 }
 
 // MARK: - Preview

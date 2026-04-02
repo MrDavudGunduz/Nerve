@@ -34,7 +34,15 @@ public enum NewsCategory: String, Sendable, Codable, CaseIterable {
 ///   `StorageLayer` defines its own `@Model` schema that maps to/from this type.
 public struct NewsItem: Sendable, Codable, Hashable, Identifiable {
 
-  /// Unique identifier for the news item.
+  /// Unique identifier for the news item, sourced from the upstream API.
+  ///
+  /// Kept as `String` rather than `UUID` because:
+  /// - IDs originate from an external REST API (format is not guaranteed to be UUID v4).
+  /// - String IDs round-trip through `Codable`, `@Attribute(.unique)`, and MapKit
+  ///   annotation reuse without any conversion overhead.
+  ///
+  /// If Nerve ever generates items locally (e.g., from on-device analysis),
+  /// use `UUID().uuidString` at creation time to ensure global uniqueness.
   public let id: String
 
   /// The headline text.

@@ -56,10 +56,24 @@ public struct NewsCluster: Sendable, Identifiable, Hashable {
     return counts.max(by: { $0.value < $1.value })?.key ?? .other
   }
 
-  /// The headline of the item closest to the centroid, used as
-  /// the representative headline for the cluster.
+  /// The headline of the item geographically closest to the cluster centroid.
+  ///
+  /// For single-item clusters this is the only item's headline.
+  /// For multi-item clusters, this picks the most "representative" story —
+  /// the one physically nearest the group's geographic centre of mass.
   public var representativeHeadline: String {
-    items.first?.headline ?? ""
+    items
+      .min(by: { distanceToCenter($0) < distanceToCenter($1) })
+      .map(\.headline) ?? ""
+  }
+
+  /// Squared Euclidean distance from an item's coordinate to the cluster centre.
+  ///
+  /// Squared distance avoids a `sqrt` call — sufficient for comparison purposes.
+  private func distanceToCenter(_ item: NewsItem) -> Double {
+    let dLat = item.coordinate.latitude - center.latitude
+    let dLon = item.coordinate.longitude - center.longitude
+    return dLat * dLat + dLon * dLon
   }
 
   /// Average credibility label across analyzed items, if any.
@@ -93,9 +107,15 @@ public struct NewsCluster: Sendable, Identifiable, Hashable {
       )
     else { return nil }
 
-    // Deterministic ID from sorted member IDs.
-    let sortedIDs = items.map(\.id).sorted()
-    self.id = sortedIDs.joined(separator: "+")
+    // Deterministic, O(n log n) hash from sorted member IDs.
+    // Using Hasher instead of a joined string prevents unbounded allocation
+    // growth when cluster sizes are large (e.g., 500+ items in a city centre).
+    // The hash value is stable within a single process lifetime — sufficient
+    // for SwiftUI/MapKit diffing purposes. NewsCluster is ephemeral by design.
+    var hasher = Hasher()
+    for id in items.map(\.id).sorted() { hasher.combine(id) }
+    self.id = String(hasher.finalize())
+
     self.center = centroid
     self.items = items
     self.latestDate = items.map(\.publishedAt).max() ?? Date.distantPast

@@ -24,6 +24,11 @@ import MapKit
 ///   forAnnotationViewWithReuseIdentifier: NewsAnnotation.clusterReuseID
 /// )
 /// ```
+// `@unchecked Sendable`: NSObject/MKAnnotation inheritance prevents the compiler
+// from verifying Sendable automatically. Safety is guaranteed manually:
+//   • All stored state is immutable (`let cluster: NewsCluster`).
+//   • `NewsCluster` is a `Sendable` value type — no shared mutable references.
+// If mutable stored properties are added in the future, add explicit synchronisation.
 public final class NewsAnnotation: NSObject, MKAnnotation, @unchecked Sendable {
 
   // MARK: - Reuse Identifiers

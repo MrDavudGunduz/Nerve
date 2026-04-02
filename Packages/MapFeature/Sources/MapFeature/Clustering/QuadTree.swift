@@ -14,22 +14,29 @@ import Foundation
 ///
 /// Used as the spatial domain for quad-tree subdivision.
 /// Coordinates use WGS-84 decimal degrees (latitude: −90…+90, longitude: −180…+180).
-public struct BoundingBox: Sendable, Hashable {
+///
+/// - Note: Internal to `MapFeature` — this is an implementation detail of
+///   ``AnnotationClusterer`` and is not part of the public API surface.
+struct BoundingBox: Sendable, Hashable {
 
   /// Minimum latitude (south edge).
-  public let minLat: Double
+  let minLat: Double
 
   /// Maximum latitude (north edge).
-  public let maxLat: Double
+  let maxLat: Double
 
   /// Minimum longitude (west edge).
-  public let minLon: Double
+  let minLon: Double
 
   /// Maximum longitude (east edge).
-  public let maxLon: Double
+  let maxLon: Double
 
   /// Creates a bounding box from the given edges.
-  public init(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double) {
+  ///
+  /// - Precondition: `minLat <= maxLat` and `minLon <= maxLon`.
+  init(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double) {
+    precondition(minLat <= maxLat, "BoundingBox: minLat (\(minLat)) must be ≤ maxLat (\(maxLat))")
+    precondition(minLon <= maxLon, "BoundingBox: minLon (\(minLon)) must be ≤ maxLon (\(maxLon))")
     self.minLat = minLat
     self.maxLat = maxLat
     self.minLon = minLon
@@ -43,10 +50,10 @@ public struct BoundingBox: Sendable, Hashable {
   var midLon: Double { (minLon + maxLon) / 2.0 }
 
   /// The latitudinal span of this box in degrees.
-  public var latSpan: Double { maxLat - minLat }
+  var latSpan: Double { maxLat - minLat }
 
   /// The longitudinal span of this box in degrees.
-  public var lonSpan: Double { maxLon - minLon }
+  var lonSpan: Double { maxLon - minLon }
 
   /// Whether the given coordinate falls within (or on the boundary of) this box.
   func contains(latitude: Double, longitude: Double) -> Bool {
@@ -74,9 +81,11 @@ public struct BoundingBox: Sendable, Hashable {
 /// The tree is rebuilt per clustering pass (not long-lived), so mutation
 /// performance is secondary to query speed.
 ///
-/// All types are `Sendable`, allowing safe use inside the actor-isolated
-/// ``AnnotationClusterer``.
-public final class QuadTree<Element: Sendable> {
+/// - Note: Internal to `MapFeature`. Exposing this type publicly would allow
+///   external callers to mutate `entries`/`children` off the actor executor,
+///   causing a data race. All access is serialized by ``AnnotationClusterer``'s
+///   actor isolation.
+final class QuadTree<Element: Sendable> {
 
   // MARK: - Types
 
@@ -117,7 +126,7 @@ public final class QuadTree<Element: Sendable> {
   ///   - boundary: The spatial domain of this tree node.
   ///   - nodeCapacity: Max elements per leaf before splitting (default: 4).
   ///   - maxDepth: Maximum recursion depth (default: 12).
-  public init(
+  init(
     boundary: BoundingBox,
     nodeCapacity: Int = 4,
     maxDepth: Int = 12
@@ -156,7 +165,7 @@ public final class QuadTree<Element: Sendable> {
   ///   - latitude: Latitude in decimal degrees.
   ///   - longitude: Longitude in decimal degrees.
   @discardableResult
-  public func insert(_ element: Element, at latitude: Double, longitude: Double) -> Bool {
+  func insert(_ element: Element, at latitude: Double, longitude: Double) -> Bool {
     guard boundary.contains(latitude: latitude, longitude: longitude) else {
       return false
     }
@@ -190,7 +199,7 @@ public final class QuadTree<Element: Sendable> {
   ///
   /// - Parameter region: The query bounding box.
   /// - Returns: Array of elements within the region.
-  public func query(in region: BoundingBox) -> [Element] {
+  func query(in region: BoundingBox) -> [Element] {
     var results: [Element] = []
     queryRecursive(in: region, results: &results)
     return results
@@ -213,7 +222,7 @@ public final class QuadTree<Element: Sendable> {
   }
 
   /// Returns all elements stored in the tree (flattened).
-  public func allElements() -> [Element] {
+  func allElements() -> [Element] {
     var results: [Element] = []
     allElementsRecursive(results: &results)
     return results

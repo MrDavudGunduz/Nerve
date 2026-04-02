@@ -184,35 +184,35 @@ struct AnnotationClustererTests {
   let clusterer = AnnotationClusterer()
 
   @Test("Empty items returns empty clusters")
-  func emptyInput() async {
+  func emptyInput() async throws {
     let region = GeoRegion(
       center: GeoCoordinate(latitude: 41, longitude: 29)!, radiusMeters: 10000)!
-    let clusters = await clusterer.cluster(items: [], in: region, zoomLevel: 10)
+    let clusters = try await clusterer.cluster(items: [], in: region, zoomLevel: 10)
     #expect(clusters.isEmpty)
   }
 
   @Test("Single item returns single cluster")
-  func singleItem() async {
+  func singleItem() async throws {
     let item = TestFixtures.makeItem(latitude: 41.0, longitude: 29.0)
     let region = GeoRegion(
       center: GeoCoordinate(latitude: 41, longitude: 29)!, radiusMeters: 10000)!
-    let clusters = await clusterer.cluster(items: [item], in: region, zoomLevel: 10)
+    let clusters = try await clusterer.cluster(items: [item], in: region, zoomLevel: 10)
     #expect(clusters.count == 1)
     #expect(!clusters.first!.isCluster)
   }
 
   @Test("Nearby items merge into a cluster at low zoom")
-  func nearbyItemsMerge() async {
+  func nearbyItemsMerge() async throws {
     let items = TestFixtures.makeItems(count: 5, nearLat: 41.0, nearLon: 29.0)
     let region = GeoRegion(
       center: GeoCoordinate(latitude: 41, longitude: 29)!, radiusMeters: 50000)!
-    let clusters = await clusterer.cluster(items: items, in: region, zoomLevel: 5)
+    let clusters = try await clusterer.cluster(items: items, in: region, zoomLevel: 5)
     // At low zoom, nearby items should merge into fewer clusters
     #expect(clusters.count < items.count)
   }
 
   @Test("Distant items remain separate at high zoom")
-  func distantItemsSeparate() async {
+  func distantItemsSeparate() async throws {
     let items = [
       TestFixtures.makeItem(id: "ist", latitude: 41.0, longitude: 29.0),
       TestFixtures.makeItem(id: "tok", latitude: 35.6, longitude: 139.7),
@@ -220,36 +220,36 @@ struct AnnotationClustererTests {
     ]
     let region = GeoRegion(
       center: GeoCoordinate(latitude: 0, longitude: 0)!, radiusMeters: 20_000_000)!
-    let clusters = await clusterer.cluster(items: items, in: region, zoomLevel: 5)
+    let clusters = try await clusterer.cluster(items: items, in: region, zoomLevel: 5)
     #expect(clusters.count == 3)
   }
 
   @Test("Zoom level affects clustering granularity")
-  func zoomAffectsGranularity() async {
+  func zoomAffectsGranularity() async throws {
     let items = TestFixtures.makeItems(count: 10, nearLat: 41.0, nearLon: 29.0)
     let region = GeoRegion(
       center: GeoCoordinate(latitude: 41, longitude: 29)!, radiusMeters: 50000)!
 
-    let lowZoomClusters = await clusterer.cluster(items: items, in: region, zoomLevel: 3)
-    let highZoomClusters = await clusterer.cluster(items: items, in: region, zoomLevel: 15)
+    let lowZoomClusters = try await clusterer.cluster(items: items, in: region, zoomLevel: 3)
+    let highZoomClusters = try await clusterer.cluster(items: items, in: region, zoomLevel: 15)
 
     // High zoom should produce more (smaller) clusters than low zoom
     #expect(highZoomClusters.count >= lowZoomClusters.count)
   }
 
   @Test("All items are accounted for in cluster output")
-  func allItemsAccountedFor() async {
+  func allItemsAccountedFor() async throws {
     let items = TestFixtures.makeItems(count: 20, nearLat: 41.0, nearLon: 29.0)
     let region = GeoRegion(
       center: GeoCoordinate(latitude: 41, longitude: 29)!, radiusMeters: 50000)!
-    let clusters = await clusterer.cluster(items: items, in: region, zoomLevel: 10)
+    let clusters = try await clusterer.cluster(items: items, in: region, zoomLevel: 10)
 
     let totalItems = clusters.reduce(0) { $0 + $1.count }
     #expect(totalItems == 20)
   }
 
   @Test("Merge radius decreases exponentially with zoom")
-  func mergeRadiusDecay() async {
+  func mergeRadiusDecay() async throws {
     let r0 = await clusterer.computeMergeRadius(for: 0)
     let r5 = await clusterer.computeMergeRadius(for: 5)
     let r10 = await clusterer.computeMergeRadius(for: 10)
@@ -309,14 +309,19 @@ struct NewsClusterTests {
     #expect(cluster.dominantCategory == .technology)
   }
 
-  @Test("Representative headline uses first item")
+  @Test("Representative headline is the item geographically closest to centroid")
   func representativeHeadline() {
+    // Centroid = avg(40.0+42.0, 28.0+30.0) = (41.0, 29.0)
+    // Item A: (40.0, 28.0) → dist² = 1+1 = 2
+    // Item B: (42.0, 30.0) → dist² = 1+1 = 2
+    // Item C: (41.0, 29.0) → dist² = 0+0 = 0  ← closest
     let items = [
-      TestFixtures.makeItem(id: "a", headline: "First Headline"),
-      TestFixtures.makeItem(id: "b", headline: "Second Headline"),
+      TestFixtures.makeItem(id: "a", headline: "Far South-West", latitude: 40.0, longitude: 28.0),
+      TestFixtures.makeItem(id: "b", headline: "Far North-East", latitude: 42.0, longitude: 30.0),
+      TestFixtures.makeItem(id: "c", headline: "At The Centroid", latitude: 41.0, longitude: 29.0),
     ]
     let cluster = NewsCluster(items: items)!
-    #expect(cluster.representativeHeadline == "First Headline")
+    #expect(cluster.representativeHeadline == "At The Centroid")
   }
 
   @Test("Average credibility label with analyzed items")
@@ -343,15 +348,24 @@ struct NewsClusterTests {
     #expect(cluster.averageCredibilityLabel == nil)
   }
 
-  @Test("Deterministic ID from sorted member IDs")
+  @Test("Cluster ID is deterministic regardless of item insertion order")
   func deterministicID() {
-    let items = [
-      TestFixtures.makeItem(id: "beta"),
+    // Items inserted in different orders must produce the same cluster ID.
+    // Note: the ID is a Hasher-based value — we test order-independence,
+    // not a specific string literal, since Hasher output is process-scoped.
+    let itemsABC = [
       TestFixtures.makeItem(id: "alpha"),
+      TestFixtures.makeItem(id: "beta"),
       TestFixtures.makeItem(id: "gamma"),
     ]
-    let cluster = NewsCluster(items: items)!
-    #expect(cluster.id == "alpha+beta+gamma")
+    let itemsCBA = [
+      TestFixtures.makeItem(id: "gamma"),
+      TestFixtures.makeItem(id: "beta"),
+      TestFixtures.makeItem(id: "alpha"),
+    ]
+    let clusterABC = NewsCluster(items: itemsABC)!
+    let clusterCBA = NewsCluster(items: itemsCBA)!
+    #expect(clusterABC.id == clusterCBA.id, "Cluster ID must be order-independent")
   }
 }
 
@@ -370,7 +384,7 @@ struct MapFeatureProtocolTests {
     let service = try await container.resolve(ClusteringServiceProtocol.self)
     let region = GeoRegion(
       center: GeoCoordinate(latitude: 41, longitude: 29)!, radiusMeters: 10000)!
-    let clusters = await service.cluster(items: [], in: region, zoomLevel: 10)
+    let clusters = try await service.cluster(items: [], in: region, zoomLevel: 10)
     #expect(clusters.isEmpty)
   }
 }

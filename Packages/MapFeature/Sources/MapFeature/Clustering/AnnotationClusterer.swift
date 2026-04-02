@@ -70,11 +70,15 @@ public actor AnnotationClusterer: ClusteringServiceProtocol {
   /// Items outside the given region are included in the tree but
   /// only clustered if they fall within the merge radius of an
   /// in-region item. This avoids abrupt cluster boundary artifacts.
+  ///
+  /// - Throws: ``NerveError`` if the engine encounters an internal failure.
+  ///   The current implementation does not throw, but the signature is
+  ///   required by ``ClusteringServiceProtocol`` for future error propagation.
   public func cluster(
     items: [NewsItem],
     in region: GeoRegion,
     zoomLevel: Double
-  ) async -> [NewsCluster] {
+  ) async throws -> [NewsCluster] {
     guard !items.isEmpty else { return [] }
 
     // 1. Compute the merge distance for the current zoom.

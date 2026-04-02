@@ -13,8 +13,16 @@ import Foundation
 /// `Core` defines only the contract to remain platform-agnostic.
 public protocol LocationServiceProtocol: Sendable {
 
-  /// The most recently observed location, or `nil` if unavailable.
-  var currentLocation: GeoCoordinate? { get async }
+  /// Returns the most recently observed location, or `nil` if no fix is available yet.
+  ///
+  /// Unlike a `get async` property, this function can propagate errors — for example,
+  /// distinguishing "no GPS fix yet" (`nil` return) from "location permission denied"
+  /// (thrown `NerveError.location`).
+  ///
+  /// - Returns: The last known ``GeoCoordinate``, or `nil` if no fix has been acquired.
+  /// - Throws: ``NerveError/location(message:context:)`` if location services are
+  ///   unavailable or permission is denied.
+  func currentLocation() async throws -> GeoCoordinate?
 
   /// Begins continuous location tracking.
   ///
