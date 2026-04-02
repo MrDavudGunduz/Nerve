@@ -9,38 +9,32 @@ import SwiftData
 
 /// A centralized registry of all SwiftData `@Model` types used across Nerve.
 ///
-/// Adding a new `@Model` to the project requires a single update here,
-/// preventing silent data loss from forgotten schema registrations.
-///
-/// ## Usage
-///
-/// ```swift
-/// let schema = Schema(ModelRegistry.allModels)
-/// let container = try ModelContainer(for: schema, ...)
-/// ```
+/// This is the **single source of truth** for the SwiftData schema.
+/// `NerveApp` passes ``allModels`` to `Schema(ModelRegistry.allModels)` so
+/// the `ModelContainer` is always consistent with every `@Model` in the project.
 ///
 /// ## Adding New Models
 ///
-/// When you create a new `@Model`, add it to ``allModels``:
+/// When you create a new `@Model`, register it here:
 ///
 /// ```swift
 /// public static let allModels: [any PersistentModel.Type] = [
-///   NewsItemModel.self,
-///   AnalysisResultModel.self,
+///   NewsItemPersistenceModel.self,
 ///   // Add new models here ↓
-///   MyNewModel.self,
+///   AnalysisResultPersistenceModel.self,
 /// ]
 /// ```
+///
+/// - Warning: Forgetting to register a model will **not** produce a compile error,
+///   but will cause a runtime crash on first SwiftData access. The
+///   `StorageLayerTests` suite includes a regression test for this.
 public enum ModelRegistry {
 
-  /// All persistent model types that must be included in the SwiftData schema.
+  /// All persistent `@Model` types included in the SwiftData schema.
   ///
-  /// - Important: Every `@Model` in the project **must** be listed here.
-  ///   Forgetting to add a model will cause a runtime crash on first access
-  ///   rather than silent data loss.
+  /// - Important: Every `@Model` defined in `StorageLayer` **must** be listed here.
   public static let allModels: [any PersistentModel.Type] = [
-    // Add @Model types here as they are implemented, e.g.:
-    // NewsItemModel.self,
-    // AnalysisResultModel.self,
+    NewsItemPersistenceModel.self
+    // ↓ Register new @Model types below this line
   ]
 }
