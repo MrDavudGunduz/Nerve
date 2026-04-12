@@ -75,7 +75,8 @@ struct ContentView: View {
         }
         .navigationTitle("Nerve")
       } detail: {
-        NerveMapView()
+        Text("Map View")
+          .foregroundStyle(.secondary)
       }
     }
   #endif

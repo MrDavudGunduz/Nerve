@@ -92,8 +92,13 @@ struct NerveApp: App {
     WindowGroup {
       ContentView()
         .environment(\.dependencyContainer, container)
+        .task {
+          await AppBootstrapper.bootstrap(
+            container: container,
+            modelContainer: sharedModelContainer
+          )
+        }
     }
     .modelContainer(sharedModelContainer)
   }
 }
-

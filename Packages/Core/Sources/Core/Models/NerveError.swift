@@ -1,4 +1,12 @@
+//
+//  NerveError.swift
+//  Core
+//
+//  Created by Davud Gunduz on 26.03.2026.
+//
+
 import Foundation
+
 
 // MARK: - ErrorContext
 
@@ -18,6 +26,20 @@ public struct ErrorContext: Sendable {
   /// The source line where the error was created.
   public let line: UInt
 
+  /// Creates a diagnostic context for a `NerveError`.
+  ///
+  /// Typically called at the throw site:
+  /// ```swift
+  /// throw NerveError.storage(
+  ///   message: "Insert failed",
+  ///   context: ErrorContext(underlyingError: swiftDataError)
+  /// )
+  /// ```
+  ///
+  /// - Parameters:
+  ///   - underlyingError: The original error, for upstream diagnostics.
+  ///   - file: Automatically captured source file name.
+  ///   - line: Automatically captured source line number.
   public init(
     underlyingError: (any Error)? = nil,
     file: String = #file,
@@ -31,13 +53,21 @@ public struct ErrorContext: Sendable {
 
 // MARK: - NerveError
 
-/// A unified error type for all recoverable errors across Nerve modules.
+/// A unified error type for all recoverable failures across Nerve modules.
 ///
-/// Each case wraps a descriptive message and an optional ``ErrorContext``
-/// that preserves the original underlying error for diagnostics.
+/// Throw `NerveError` from any service layer and catch it in the ViewModel
+/// or UI. Each case carries a human-readable `message` and an optional
+/// ``ErrorContext`` for structured diagnostic logging.
+///
+/// ```swift
+/// throw NerveError.network(
+///   message: "Request timed out after 30s",
+///   context: ErrorContext(underlyingError: urlError)
+/// )
+/// ```
 ///
 /// `Equatable` conformance compares only the case and message,
-/// ignoring the context (which contains non-equatable `any Error`).
+/// ignoring `ErrorContext` (which wraps a non-equatable `any Error`).
 public enum NerveError: Error, Sendable {
 
   /// A network request failed.
@@ -84,6 +114,8 @@ extension NerveError: Equatable {
 
 // MARK: - LocalizedError
 
+/// Provides a user-readable `errorDescription` that can be displayed
+/// directly in UI banners or `os_log` messages.
 extension NerveError: LocalizedError {
   public var errorDescription: String? {
     switch self {

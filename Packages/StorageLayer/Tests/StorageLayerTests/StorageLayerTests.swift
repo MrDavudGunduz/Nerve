@@ -34,8 +34,7 @@ struct ModelRegistryTests {
   func registryIsNonEmpty() {
     #expect(
       !ModelRegistry.allModels.isEmpty,
-      "ModelRegistry.allModels must contain at least one @Model type. "
-        + "Add your new @Model to ModelRegistry.allModels in ModelRegistry.swift."
+      "ModelRegistry.allModels must not be empty — add new @Model types to ModelRegistry.allModels."
     )
   }
 
@@ -44,7 +43,7 @@ struct ModelRegistryTests {
     let typeNames = ModelRegistry.allModels.map { String(describing: $0) }
     #expect(
       typeNames.contains("NewsItemPersistenceModel"),
-      "NewsItemPersistenceModel must be registered in ModelRegistry.allModels"
+      "NewsItemPersistenceModel must be registered in ModelRegistry.allModels."
     )
   }
 }

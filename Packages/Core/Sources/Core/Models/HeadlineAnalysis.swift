@@ -44,14 +44,27 @@ public struct HeadlineAnalysis: Sendable, Codable, Hashable {
   }
 
   /// A human-readable credibility label derived from the clickbait score.
+  ///
+  /// Delegates to the static ``credibilityLabel(for:)`` helper so that
+  /// any consumer (e.g. ``NewsCluster``) can compute a label for an
+  /// arbitrary score without constructing a full `HeadlineAnalysis`.
   public var credibilityLabel: CredibilityLabel {
-    switch clickbaitScore {
-    case ..<0.3:
-      return .verified
-    case 0.3..<0.7:
-      return .caution
-    default:
-      return .clickbait
+    Self.credibilityLabel(for: clickbaitScore)
+  }
+
+  /// Computes the credibility label for a given clickbait score.
+  ///
+  /// This is the **single source of truth** for all threshold logic.
+  /// Both ``credibilityLabel`` and ``NewsCluster/averageCredibilityLabel``
+  /// delegate here so that boundary changes only need to be made once.
+  ///
+  /// - Parameter score: A clickbait score in the range 0.0 … 1.0.
+  /// - Returns: The corresponding ``CredibilityLabel``.
+  public static func credibilityLabel(for score: Double) -> CredibilityLabel {
+    switch score {
+    case ..<0.3: return .verified
+    case 0.3..<0.7: return .caution
+    default: return .clickbait
     }
   }
 }

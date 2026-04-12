@@ -26,7 +26,11 @@ public protocol LocationServiceProtocol: Sendable {
 
   /// Begins continuous location tracking.
   ///
-  /// - Throws: If location permissions are denied or services are unavailable.
+  /// Presents the system permission prompt on first call if
+  /// authorization status is `.notDetermined`.
+  ///
+  /// - Throws: ``NerveError/location(message:context:)`` if location
+  ///   permissions are denied or services are unavailable.
   func startTracking() async throws
 
   /// Stops continuous location tracking and releases resources.
@@ -34,6 +38,11 @@ public protocol LocationServiceProtocol: Sendable {
 
   /// Requests the user's location once without starting continuous tracking.
   ///
+  /// Uses `CLLocationManager.requestLocation()` internally — provides
+  /// a single best-available fix in approximately 10 seconds.
+  ///
   /// - Returns: The user's current ``GeoCoordinate``.
+  /// - Throws: ``NerveError/location(message:context:)`` if the fix fails
+  ///   or permission is denied.
   func requestCurrentLocation() async throws -> GeoCoordinate
 }

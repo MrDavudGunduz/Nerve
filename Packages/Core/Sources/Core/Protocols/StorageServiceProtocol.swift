@@ -37,8 +37,14 @@ public protocol StorageServiceProtocol: Sendable {
   /// Deletes a news item by its unique identifier.
   ///
   /// - Parameter id: The ID of the item to remove.
+  /// - Throws: A storage error if the delete operation fails.
   func deleteNews(id: String) async throws
 
   /// Removes all cached data that has exceeded its time-to-live.
+  ///
+  /// Safe to call from a background refresh task.
+  /// No-op if no items are expired.
+  ///
+  /// - Throws: A storage error if the prune operation fails.
   func pruneExpiredCache() async throws
 }

@@ -9,16 +9,33 @@ import Foundation
 
 // MARK: - NewsCategory
 
-/// A classification category for a news item.
+/// The topic classification for a news item.
+///
+/// Used throughout Nerve to:
+/// - Select the category color and SF Symbol on map annotations.
+/// - Determine the ``NewsCluster/dominantCategory`` for cluster bubbles.
+/// - Filter or group news in list and search views.
+///
+/// The `rawValue` is the persisted string in SwiftData
+/// and must not be changed without a migration.
 public enum NewsCategory: String, Sendable, Codable, CaseIterable {
+  /// Government, elections, legislation, and international relations.
   case politics
+  /// Software, hardware, AI, and digital innovation.
   case technology
+  /// Research, discovery, engineering, and natural sciences.
   case science
+  /// Medicine, public health, fitness, and mental wellness.
   case health
+  /// Professional and amateur sports events and athlete news.
   case sports
+  /// Film, music, television, gaming, and celebrity culture.
   case entertainment
+  /// Markets, economics, corporate news, and personal finance.
   case business
+  /// Climate, nature, conservation, and sustainability.
   case environment
+  /// Stories that don't fit a primary category.
   case other
 }
 

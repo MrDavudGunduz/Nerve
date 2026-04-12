@@ -91,7 +91,17 @@
 
     private func configure() {
       guard let newsAnnotation = annotation as? NewsAnnotation else { return }
-      guard let item = newsAnnotation.cluster.items.first else { return }
+      configure(with: newsAnnotation.cluster)
+    }
+
+    /// Configures the view with the given cluster.
+    ///
+    /// Called by ``NerveMapView/Coordinator`` after dequeuing to populate
+    /// category color, icon, and credibility badge for the supplied cluster.
+    ///
+    /// - Parameter cluster: The ``NewsCluster`` to render.
+    public func configure(with cluster: NewsCluster) {
+      guard let item = cluster.items.first else { return }
 
       // Background color: category.
       backgroundColor = ClusterAnnotationView.color(for: item.category)

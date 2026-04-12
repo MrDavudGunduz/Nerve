@@ -5,6 +5,7 @@
 //  Created by Davud Gunduz on 31.03.2026.
 //
 
+import CryptoKit
 import Foundation
 
 // MARK: - NewsCluster
@@ -107,14 +108,18 @@ public struct NewsCluster: Sendable, Identifiable, Hashable {
       )
     else { return nil }
 
-    // Deterministic, O(n log n) hash from sorted member IDs.
-    // Using Hasher instead of a joined string prevents unbounded allocation
-    // growth when cluster sizes are large (e.g., 500+ items in a city centre).
-    // The hash value is stable within a single process lifetime — sufficient
-    // for SwiftUI/MapKit diffing purposes. NewsCluster is ephemeral by design.
-    var hasher = Hasher()
-    for id in items.map(\.id).sorted() { hasher.combine(id) }
-    self.id = String(hasher.finalize())
+    // Deterministic, cross-process-stable ID derived from the SHA-256 digest
+    // of the sorted, comma-joined member IDs.
+    //
+    // Why SHA-256 instead of Swift's Hasher:
+    //   • Hasher uses per-process random seeding (Swift 4.2+), making its
+    //     output change across app launches.
+    //   • If a cluster ID ever reaches NavigationPath, state restoration,
+    //     or a persistence layer, a Hasher-based ID would silently break it.
+    //   • CryptoKit.SHA256 is a system framework — no extra SPM dependency.
+    let sortedIDs = items.map(\.id).sorted().joined(separator: ",")
+    let digest = SHA256.hash(data: Data(sortedIDs.utf8))
+    self.id = digest.compactMap { String(format: "%02x", $0) }.joined()
 
     self.center = centroid
     self.items = items
@@ -122,20 +127,5 @@ public struct NewsCluster: Sendable, Identifiable, Hashable {
   }
 }
 
-// MARK: - HeadlineAnalysis Extension
-
-extension HeadlineAnalysis {
-
-  /// Computes the credibility label for a given clickbait score.
-  ///
-  /// This is extracted as a static helper so that `NewsCluster` can
-  /// compute an average credibility without constructing a full
-  /// `HeadlineAnalysis` instance.
-  public static func credibilityLabel(for score: Double) -> CredibilityLabel {
-    switch score {
-    case ..<0.3: return .verified
-    case 0.3..<0.7: return .caution
-    default: return .clickbait
-    }
-  }
-}
+// Note: HeadlineAnalysis.credibilityLabel(for:) lives in HeadlineAnalysis.swift
+// and is the single source of truth for threshold logic.
