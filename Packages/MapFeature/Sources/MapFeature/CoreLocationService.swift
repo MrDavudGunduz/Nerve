@@ -77,8 +77,8 @@
       manager.distanceFilter = 500  // Emit updates every ~500 m
 
       // Forward delegate callbacks into this service via the delegate bridge.
-      delegate.onLocationUpdate = { [weak continuation] coord in
-        continuation?.yield(coord)
+      delegate.onLocationUpdate = { coord in
+        continuation.yield(coord)
       }
     }
 

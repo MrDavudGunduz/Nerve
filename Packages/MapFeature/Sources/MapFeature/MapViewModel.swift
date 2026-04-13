@@ -30,11 +30,13 @@ import Observation
 ///
 /// ## Threading
 ///
-/// - All `@Observable` state mutations happen on `@MainActor`.
+/// - `@MainActor` isolation guarantees all `@Observable` state mutations are
+///   dispatched on the main thread — no `@unchecked Sendable` suppression needed.
 /// - Clustering runs on `AnnotationClusterer`'s actor (off main thread).
 /// - Storage and network calls are awaited without blocking the main thread.
+@MainActor
 @Observable
-public final class MapViewModel: @unchecked Sendable {
+public final class MapViewModel {
 
   // MARK: - Published State
 
@@ -50,13 +52,34 @@ public final class MapViewModel: @unchecked Sendable {
   /// The user's current location (if available). Used to center the map.
   public private(set) var userLocation: GeoCoordinate?
 
+  /// The set of categories currently shown on the map.
+  ///
+  /// An empty set means **all categories** are visible.
+  /// Use ``toggleCategory(_:)`` to add/remove categories.
+  public private(set) var selectedCategories: Set<NewsCategory> = []
+
   // MARK: - Private State
 
   /// All items currently in memory (cached + fetched this session).
   private var allItems: [NewsItem] = []
 
+  /// Items after applying the active category filter.
+  ///
+  /// Returns `allItems` unchanged when `selectedCategories` is empty.
+  private var filteredItems: [NewsItem] {
+    guard !selectedCategories.isEmpty else { return allItems }
+    return allItems.filter { selectedCategories.contains($0.category) }
+  }
+
   /// The last region successfully loaded for — used for deduplication.
   private var lastRegion: GeoRegion?
+
+  /// Tracked handle for the most-recently-initiated background save task.
+  ///
+  /// Storing the handle allows the previous save to be cancelled when a
+  /// newer batch of items supersedes it, and prevents the task from being
+  /// silently leaked when the view model is torn down.
+  private var saveTask: Task<Void, Never>?
 
   private let logger = Logger(subsystem: "com.davudgunduz.Nerve", category: "MapViewModel")
 
@@ -94,7 +117,6 @@ public final class MapViewModel: @unchecked Sendable {
   // MARK: - Public API
 
   /// Starts user location tracking and centers the map on the first fix.
-  @MainActor
   public func startLocationTracking() async {
     do {
       try await locationService.startTracking()
@@ -116,7 +138,6 @@ public final class MapViewModel: @unchecked Sendable {
   /// - Parameters:
   ///   - region: The visible map region to load data for.
   ///   - zoomLevel: Current zoom level for clustering granularity.
-  @MainActor
   public func loadNews(for region: GeoRegion, zoomLevel: Double) async {
     guard !isLoading else { return }
     isLoading = true
@@ -136,10 +157,6 @@ public final class MapViewModel: @unchecked Sendable {
 
       if !fetched.isEmpty {
         logger.info("Network: \(fetched.count) items received")
-        // Persist in background — don't block clustering.
-        Task.detached(priority: .background) { [weak self] in
-          try? await self?.storageService.saveNews(fetched)
-        }
 
         // Merge: network items take precedence over identical cached items.
         let allByID = Dictionary(
@@ -149,15 +166,16 @@ public final class MapViewModel: @unchecked Sendable {
         let merged = Array(allByID.values)
         allItems = merged
         await updateClusters(with: merged, in: region, zoomLevel: zoomLevel)
+
+        // Persist after clustering — cancel any superseded save.
+        scheduleSave(merged)
       } else if cached.isEmpty {
         // Nothing from cache or network — inject seed data.
         logger.info("Empty data — loading seed data for development.")
         let seed = SeedData.istanbulItems
-        Task.detached(priority: .background) { [weak self] in
-          try? await self?.storageService.saveNews(seed)
-        }
         allItems = seed
         await updateClusters(with: seed, in: region, zoomLevel: zoomLevel)
+        scheduleSave(seed)
       }
 
     } catch let nerveError as NerveError {
@@ -165,7 +183,7 @@ public final class MapViewModel: @unchecked Sendable {
       if clusters.isEmpty {
         self.error = nerveError
       }
-      logger.warning("Network fetch failed: \(nerveError.errorDescription ?? "unknown")")
+      logger.warning("Network fetch failed: \(nerveError.debugDescription)")
     } catch {
       logger.error("Unexpected error in loadNews: \(error.localizedDescription)")
     }
@@ -176,15 +194,18 @@ public final class MapViewModel: @unchecked Sendable {
   /// Re-clusters the current item set for a new zoom level without fetching.
   ///
   /// Called when the user pans/zooms without a significant region change.
-  @MainActor
   public func recluster(in region: GeoRegion, zoomLevel: Double) async {
     guard !allItems.isEmpty else { return }
-    await updateClusters(with: allItems, in: region, zoomLevel: zoomLevel)
+    await updateClusters(with: filteredItems, in: region, zoomLevel: zoomLevel)
   }
 
   /// Clears all clusters, items, and error state.
-  @MainActor
+  ///
+  /// Cancels any in-flight background save before clearing state so that
+  /// a stale batch cannot be written after the view model has been reset.
   public func reset() {
+    saveTask?.cancel()
+    saveTask = nil
     clusters = []
     allItems = []
     error = nil
@@ -192,9 +213,38 @@ public final class MapViewModel: @unchecked Sendable {
     lastRegion = nil
   }
 
+  /// Toggles a category in the active filter set and immediately re-clusters.
+  ///
+  /// Selecting a category already in the set **removes** it (deselect).
+  /// Selecting a category not in the set **adds** it.
+  /// When the set becomes empty all items are shown.
+  ///
+  /// - Parameters:
+  ///   - category: The category to toggle.
+  ///   - region: The current visible region (needed for re-clustering).
+  ///   - zoomLevel: The current zoom level.
+  public func toggleCategory(
+    _ category: NewsCategory,
+    in region: GeoRegion,
+    zoomLevel: Double
+  ) async {
+    if selectedCategories.contains(category) {
+      selectedCategories.remove(category)
+    } else {
+      selectedCategories.insert(category)
+    }
+    await updateClusters(with: filteredItems, in: region, zoomLevel: zoomLevel)
+  }
+
+  /// Clears all category filters and shows all items.
+  public func clearCategoryFilter(in region: GeoRegion, zoomLevel: Double) async {
+    guard !selectedCategories.isEmpty else { return }
+    selectedCategories.removeAll()
+    await updateClusters(with: filteredItems, in: region, zoomLevel: zoomLevel)
+  }
+
   // MARK: - Private
 
-  @MainActor
   private func updateClusters(
     with items: [NewsItem],
     in region: GeoRegion,
@@ -206,6 +256,27 @@ public final class MapViewModel: @unchecked Sendable {
       logger.debug("Clustered \(items.count) items → \(result.count) clusters")
     } catch {
       logger.error("Clustering failed: \(error.localizedDescription)")
+    }
+  }
+
+  /// Schedules a background save, cancelling any previous in-flight save.
+  ///
+  /// Using a non-detached `Task` keeps the work within the `@MainActor`
+  /// context (for priority propagation) while suspending away from the
+  /// main thread during the `await storageService.saveNews` call.
+  /// The `saveTask` handle lets us cancel stale saves on `reset()`.
+  ///
+  /// - Parameter items: The items to persist.
+  private func scheduleSave(_ items: [NewsItem]) {
+    saveTask?.cancel()
+    saveTask = Task(priority: .background) { [weak self] in
+      guard let self, !Task.isCancelled else { return }
+      do {
+        try await storageService.saveNews(items)
+        logger.debug("Persisted \(items.count) items to storage.")
+      } catch {
+        logger.warning("Background save failed: \(error.localizedDescription)")
+      }
     }
   }
 }

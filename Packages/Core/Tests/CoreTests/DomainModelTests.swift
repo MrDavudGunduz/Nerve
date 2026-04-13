@@ -217,20 +217,39 @@ struct DomainModelTests {
 
   // MARK: - NerveError LocalizedError
 
-  @Test("NerveError errorDescription contains message for all cases")
-  func nerveErrorDescriptions() {
-    let cases: [(NerveError, String)] = [
-      (.network(message: "timeout"), "Network error: timeout"),
-      (.storage(message: "full"), "Storage error: full"),
-      (.ai(message: "model fail"), "AI analysis error: model fail"),
-      (.location(message: "denied"), "Location error: denied"),
-      (.dependency(message: "missing"), "Dependency error: missing"),
-      (.unknown(message: "oops"), "Unexpected error: oops"),
-    ]
+  @Test("NerveError errorDescription returns user-facing generic messages")
+  func nerveErrorUserFacingDescriptions() {
+    // errorDescription must be concise, user-friendly, and never leak raw detail.
+    #expect(
+      NerveError.network(message: "timeout").errorDescription
+        == "A network error occurred. Please check your connection.")
+    #expect(
+      NerveError.storage(message: "full").errorDescription
+        == "A local storage error occurred. Please restart the app.")
+    #expect(
+      NerveError.ai(message: "model fail").errorDescription == "Analysis could not be completed.")
+    #expect(
+      NerveError.location(message: "denied").errorDescription
+        == "Location services are unavailable.")
+    #expect(
+      NerveError.dependency(message: "missing").errorDescription
+        == "An internal configuration error occurred.")
+    #expect(NerveError.unknown(message: "oops").errorDescription == "An unexpected error occurred.")
+  }
 
-    for (error, expectedDescription) in cases {
-      #expect(error.errorDescription == expectedDescription)
-    }
+  @Test("NerveError debugDescription embeds the technical message and case name")
+  func nerveErrorDebugDescriptions() {
+    // debugDescription must include the case tag and full message for structured logging.
+    #expect(
+      NerveError.network(message: "timeout").debugDescription == "[NerveError.network] timeout")
+    #expect(NerveError.storage(message: "full").debugDescription == "[NerveError.storage] full")
+    #expect(NerveError.ai(message: "model fail").debugDescription == "[NerveError.ai] model fail")
+    #expect(
+      NerveError.location(message: "denied").debugDescription == "[NerveError.location] denied")
+    #expect(
+      NerveError.dependency(message: "missing").debugDescription
+        == "[NerveError.dependency] missing")
+    #expect(NerveError.unknown(message: "oops").debugDescription == "[NerveError.unknown] oops")
   }
 
   @Test("NerveError with context still equals error without context")

@@ -84,12 +84,11 @@ enum AppBootstrapper {
 
     // Production: @MainActor-isolated CLLocationManager bridge.
     await container.register(LocationServiceProtocol.self, lifetime: .singleton) {
-      CoreLocationService()
+      await CoreLocationService()
     }
 
-    logger.info(
-      "Bootstrap complete: \(await container.registrationCount, privacy: .public) services registered."
-    )
+    let count = await container.registrationCount
+    logger.info("Bootstrap complete: \(count, privacy: .public) services registered.")
   }
 }
 
@@ -118,21 +117,6 @@ private struct StubNewsService: NewsServiceProtocol {
   }
 }
 
-// MARK: StubStorageService
-
-private struct StubStorageService: StorageServiceProtocol {
-
-  func saveNews(_ items: [NewsItem]) async throws {}
-
-  func fetchNews(in region: GeoRegion?, limit: Int?, offset: Int?) async throws -> [NewsItem] {
-    []
-  }
-
-  func deleteNews(id: String) async throws {}
-
-  func pruneExpiredCache() async throws {}
-}
-
 // MARK: StubAIAnalysisService
 
 private struct StubAIAnalysisService: AIAnalysisServiceProtocol {
@@ -145,21 +129,5 @@ private struct StubAIAnalysisService: AIAnalysisServiceProtocol {
     headlines.map { _ in
       HeadlineAnalysis(clickbaitScore: 0.0, sentiment: .neutral, confidence: 0.0)
     }
-  }
-}
-
-// MARK: StubLocationService
-
-private struct StubLocationService: LocationServiceProtocol {
-
-  func currentLocation() async throws -> GeoCoordinate? { nil }
-
-  func startTracking() async throws {}
-
-  func stopTracking() async {}
-
-  func requestCurrentLocation() async throws -> GeoCoordinate {
-    // Istanbul as default until real location is available.
-    GeoCoordinate(latitude: 41.0082, longitude: 28.9784)!
   }
 }

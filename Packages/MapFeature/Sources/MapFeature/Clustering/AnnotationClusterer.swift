@@ -49,10 +49,32 @@ public actor AnnotationClusterer: ClusteringServiceProtocol {
 
   /// Creates a clusterer with configurable merge parameters.
   ///
+  /// ## Merge Radius Tuning
+  ///
+  /// The merge radius at any zoom level is: `baseMergeRadius / 2^zoomLevel`
+  ///
+  /// With the **default** `baseMergeRadius = 40.0`:
+  ///
+  /// | Zoom | Radius (°) | ~km at mid-lat |
+  /// |------|----------|----------------|
+  /// | 0    | 40.0     | 4,440 km       |
+  /// | 3    | 5.0      | 555 km         |
+  /// | 5    | 1.25     | 139 km         |
+  /// | 8    | 0.156    | 17 km          |
+  /// | 10   | 0.039    | 4.3 km         |
+  /// | 12   | 0.010    | 1.1 km         |
+  /// | 15   | 0.001    | clamped        |
+  ///
+  /// Increase `baseMergeRadius` to produce larger clusters (more aggressive
+  /// grouping at every zoom level). Decrease it for finer granularity.
+  /// Tune `minimumMergeRadius` to prevent items from merging at street level.
+  ///
   /// - Parameters:
   ///   - baseMergeRadius: Degrees at zoom 0 (default: 40.0).
-  ///   - minimumMergeRadius: Floor radius in degrees (default: 0.001).
-  ///   - nodeCapacity: Quad-tree leaf capacity (default: 4).
+  ///     This yields visually balanced clusters on a world-scale map.
+  ///   - minimumMergeRadius: Floor radius in degrees (default: 0.001 ≈ 111 m).
+  ///     Items closer than this will always cluster regardless of zoom.
+  ///   - nodeCapacity: Quad-tree leaf capacity before subdivision (default: 4).
   public init(
     baseMergeRadius: Double = 40.0,
     minimumMergeRadius: Double = 0.001,

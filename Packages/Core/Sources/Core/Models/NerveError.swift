@@ -7,7 +7,6 @@
 
 import Foundation
 
-
 // MARK: - ErrorContext
 
 /// Additional diagnostic information attached to a ``NerveError``.
@@ -114,23 +113,35 @@ extension NerveError: Equatable {
 
 // MARK: - LocalizedError
 
-/// Provides a user-readable `errorDescription` that can be displayed
-/// directly in UI banners or `os_log` messages.
+/// Provides a **user-facing** `errorDescription` suitable for display in UI banners.
+///
+/// Keep these messages concise and non-technical. For structured log output,
+/// use ``debugDescription`` which includes the full underlying detail.
 extension NerveError: LocalizedError {
   public var errorDescription: String? {
     switch self {
-    case .network(let message, _):
-      return "Network error: \(message)"
-    case .storage(let message, _):
-      return "Storage error: \(message)"
-    case .ai(let message, _):
-      return "AI analysis error: \(message)"
-    case .location(let message, _):
-      return "Location error: \(message)"
-    case .dependency(let message, _):
-      return "Dependency error: \(message)"
-    case .unknown(let message, _):
-      return "Unexpected error: \(message)"
+    case .network: return "A network error occurred. Please check your connection."
+    case .storage: return "A local storage error occurred. Please restart the app."
+    case .ai: return "Analysis could not be completed."
+    case .location: return "Location services are unavailable."
+    case .dependency: return "An internal configuration error occurred."
+    case .unknown: return "An unexpected error occurred."
+    }
+  }
+}
+
+// MARK: - CustomDebugStringConvertible
+
+/// Provides the full technical error detail used exclusively in `os_log` and Instruments.
+extension NerveError: CustomDebugStringConvertible {
+  public var debugDescription: String {
+    switch self {
+    case .network(let message, _): return "[NerveError.network] \(message)"
+    case .storage(let message, _): return "[NerveError.storage] \(message)"
+    case .ai(let message, _): return "[NerveError.ai] \(message)"
+    case .location(let message, _): return "[NerveError.location] \(message)"
+    case .dependency(let message, _): return "[NerveError.dependency] \(message)"
+    case .unknown(let message, _): return "[NerveError.unknown] \(message)"
     }
   }
 }

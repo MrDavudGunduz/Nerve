@@ -89,6 +89,12 @@ public actor PersistenceActor {
         record.publishedAt = item.publishedAt
         record.imageURLString = item.imageURL?.absoluteString
         record.cachedAt = now
+        // Persist AI analysis results — only overwrite when new data is present.
+        if let analysis = item.analysis {
+          record.clickbaitScore = analysis.clickbaitScore
+          record.sentimentRaw = analysis.sentiment.rawValue
+          record.analysisConfidence = analysis.confidence
+        }
       } else {
         let model = NewsItemPersistenceModel(from: item)
         modelContext.insert(model)

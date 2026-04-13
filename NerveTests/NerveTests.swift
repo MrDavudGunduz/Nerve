@@ -39,7 +39,9 @@ struct NerveTests {
     let container = DependencyContainer()
     await container.register(NewsServiceProtocol.self) { StubNewsService() }
     let service = try await container.resolve(NewsServiceProtocol.self)
-    let results = try await service.fetchHeadlines(in: nil, limit: 1)
+    let region = GeoRegion(
+      center: GeoCoordinate(latitude: 41, longitude: 29)!, radiusMeters: 50_000)!
+    let results = try await service.fetchNews(for: region)
     #expect(results.isEmpty)
   }
 
@@ -47,28 +49,29 @@ struct NerveTests {
 
   @Test("GeoCoordinate rejects out-of-range latitude")
   func geoCoordinateInvalidLatitude() {
-    #expect(GeoCoordinate(latitude:  91.0, longitude:   0.0) == nil)
-    #expect(GeoCoordinate(latitude: -91.0, longitude:   0.0) == nil)
+    #expect(GeoCoordinate(latitude: 91.0, longitude: 0.0) == nil)
+    #expect(GeoCoordinate(latitude: -91.0, longitude: 0.0) == nil)
   }
 
   @Test("GeoCoordinate rejects out-of-range longitude")
   func geoCoordinateInvalidLongitude() {
-    #expect(GeoCoordinate(latitude: 0.0, longitude:  181.0) == nil)
+    #expect(GeoCoordinate(latitude: 0.0, longitude: 181.0) == nil)
     #expect(GeoCoordinate(latitude: 0.0, longitude: -181.0) == nil)
   }
 
   @Test("GeoCoordinate accepts boundary values")
   func geoCoordinateBoundaryValues() {
-    #expect(GeoCoordinate(latitude:  90.0, longitude:  180.0) != nil)
+    #expect(GeoCoordinate(latitude: 90.0, longitude: 180.0) != nil)
     #expect(GeoCoordinate(latitude: -90.0, longitude: -180.0) != nil)
-    #expect(GeoCoordinate(latitude:   0.0, longitude:    0.0) != nil)
+    #expect(GeoCoordinate(latitude: 0.0, longitude: 0.0) != nil)
   }
 }
 
 // MARK: - Stub
 
 private struct StubNewsService: NewsServiceProtocol {
-  func fetchHeadlines(in region: GeoRegion?, limit: Int?) async throws -> [NewsItem] { [] }
-  func fetchDetails(id: String) async throws -> NewsItem? { nil }
-  func refreshCache(in region: GeoRegion?) async throws {}
+  func fetchNews(for region: GeoRegion) async throws -> [NewsItem] { [] }
+  func fetchNewsDetail(id: String) async throws -> NewsItem {
+    throw NerveError.network(message: "Not implemented")
+  }
 }

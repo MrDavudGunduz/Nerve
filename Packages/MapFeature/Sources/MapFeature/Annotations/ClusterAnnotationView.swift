@@ -36,18 +36,12 @@
       return label
     }()
 
-    private let credibilityDot: UIView = {
-      let dot = UIView()
-      dot.layer.cornerRadius = 5
-      dot.layer.borderWidth = 1.5
-      dot.layer.borderColor = UIColor.white.cgColor
-      return dot
-    }()
-
     // MARK: - Constants
 
     private static let baseSize: CGFloat = 44
     private static let maxSize: CGFloat = 64
+    /// Width of the credibility ring border.
+    private static let ringWidth: CGFloat = 3.5
 
     // MARK: - Init
 
@@ -64,13 +58,14 @@
     // MARK: - Setup
 
     private func setupView() {
-      canShowCallout = true
+      canShowCallout = false  // Bottom sheet replaces callout.
       collisionMode = .circle
       displayPriority = .defaultHigh
 
       addSubview(countLabel)
-      addSubview(credibilityDot)
 
+      layer.borderWidth = Self.ringWidth
+      layer.borderColor = UIColor.white.withAlphaComponent(0.4).cgColor
       layer.shadowColor = UIColor.black.cgColor
       layer.shadowOpacity = 0.2
       layer.shadowOffset = CGSize(width: 0, height: 2)
@@ -86,7 +81,7 @@
     override public func prepareForReuse() {
       super.prepareForReuse()
       countLabel.text = nil
-      credibilityDot.backgroundColor = .clear
+      layer.borderColor = UIColor.white.withAlphaComponent(0.4).cgColor
       layer.removeAllAnimations()
       transform = .identity
       alpha = 1.0
@@ -100,7 +95,7 @@
     /// Configures the view with the given cluster.
     ///
     /// Called by ``NerveMapView/Coordinator`` after dequeuing to populate
-    /// count label, size, category color, and credibility dot.
+    /// count label, size, category color, and credibility ring.
     ///
     /// - Parameter cluster: The ``NewsCluster`` to render.
     public func configure(with cluster: NewsCluster) {
@@ -122,18 +117,36 @@
       countLabel.text = "\(cluster.count)"
       countLabel.frame = bounds
 
-      // Credibility dot (top-right corner).
-      let dotSize: CGFloat = 10
-      credibilityDot.frame = CGRect(
-        x: size - dotSize - 2, y: 2,
-        width: dotSize, height: dotSize
-      )
+      // Credibility ring — visible border whose color signals trustworthiness.
       if let label = cluster.averageCredibilityLabel {
-        credibilityDot.backgroundColor = Self.credibilityColor(for: label)
-        credibilityDot.isHidden = false
+        layer.borderColor = Self.credibilityColor(for: label).cgColor
       } else {
-        credibilityDot.isHidden = true
+        // No analysis yet — neutral ring.
+        layer.borderColor = UIColor.white.withAlphaComponent(0.35).cgColor
       }
+    }
+
+    // MARK: - Skeleton
+
+    /// Replaces real content with a pulsing grey placeholder while data loads.
+    public func showSkeleton() {
+      countLabel.text = nil
+      backgroundColor = .systemGray4
+      layer.borderColor = UIColor.clear.cgColor
+
+      let pulse = CABasicAnimation(keyPath: "opacity")
+      pulse.fromValue = 1.0
+      pulse.toValue = 0.4
+      pulse.duration = 0.8
+      pulse.autoreverses = true
+      pulse.repeatCount = .infinity
+      pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+      layer.add(pulse, forKey: "skeletonPulse")
+    }
+
+    /// Restores the normal appearance after data has loaded.
+    public func hideSkeleton() {
+      layer.removeAnimation(forKey: "skeletonPulse")
     }
 
     // MARK: - Animation

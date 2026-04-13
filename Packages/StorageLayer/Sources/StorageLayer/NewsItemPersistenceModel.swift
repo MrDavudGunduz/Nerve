@@ -71,6 +71,18 @@ public final class NewsItemPersistenceModel {
   /// The cached date when this record was last fetched from the network.
   public var cachedAt: Date
 
+  // MARK: - AI Analysis Fields
+
+  /// Clickbait score produced by the on-device AI model (0.0 genuine → 1.0 clickbait).
+  /// `nil` if analysis has not been run yet.
+  public var clickbaitScore: Double?
+
+  /// Raw value of ``Core/Sentiment`` (e.g. "positive", "neutral", "negative").
+  public var sentimentRaw: String?
+
+  /// The model's confidence level for the analysis result (0.0 … 1.0).
+  public var analysisConfidence: Double?
+
   // MARK: - Init
 
   /// Creates a persistence model from the given domain model.
@@ -88,6 +100,10 @@ public final class NewsItemPersistenceModel {
     self.publishedAt = item.publishedAt
     self.imageURLString = item.imageURL?.absoluteString
     self.cachedAt = Date()
+    // AI analysis — persisted when available; nil when Phase 3 is incomplete.
+    self.clickbaitScore = item.analysis?.clickbaitScore
+    self.sentimentRaw = item.analysis?.sentiment.rawValue
+    self.analysisConfidence = item.analysis?.confidence
   }
 
   // MARK: - Domain Conversion
@@ -110,6 +126,19 @@ public final class NewsItemPersistenceModel {
       )
     }
 
+    // Reconstruct HeadlineAnalysis if all three fields are present.
+    let analysis: HeadlineAnalysis?
+    if let score = clickbaitScore,
+      let sentimentStr = sentimentRaw,
+      let sentiment = Sentiment(rawValue: sentimentStr),
+      let confidence = analysisConfidence
+    {
+      analysis = HeadlineAnalysis(
+        clickbaitScore: score, sentiment: sentiment, confidence: confidence)
+    } else {
+      analysis = nil
+    }
+
     return NewsItem(
       id: id,
       headline: headline,
@@ -119,7 +148,8 @@ public final class NewsItemPersistenceModel {
       category: category,
       coordinate: coordinate,
       publishedAt: publishedAt,
-      imageURL: imageURLString.flatMap(URL.init(string:))
+      imageURL: imageURLString.flatMap(URL.init(string:)),
+      analysis: analysis
     )
   }
 }

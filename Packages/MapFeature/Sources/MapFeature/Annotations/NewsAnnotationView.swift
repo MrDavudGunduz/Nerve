@@ -30,17 +30,11 @@
       return imageView
     }()
 
-    private let badgeView: UIView = {
-      let view = UIView()
-      view.layer.cornerRadius = 6
-      view.layer.borderWidth = 1.5
-      view.layer.borderColor = UIColor.white.cgColor
-      return view
-    }()
-
     // MARK: - Constants
 
     private static let pinSize: CGFloat = 36
+    /// Width of the credibility ring border.
+    private static let ringWidth: CGFloat = 3
 
     // MARK: - Init
 
@@ -61,18 +55,19 @@
       frame = CGRect(x: 0, y: 0, width: size, height: size)
       centerOffset = CGPoint(x: 0, y: -size / 2)
 
-      canShowCallout = true
+      canShowCallout = false  // Bottom sheet replaces callout.
       collisionMode = .circle
       displayPriority = .defaultLow
 
       layer.cornerRadius = size / 2
+      layer.borderWidth = Self.ringWidth
+      layer.borderColor = UIColor.white.withAlphaComponent(0.4).cgColor
       layer.shadowColor = UIColor.black.cgColor
       layer.shadowOpacity = 0.15
       layer.shadowOffset = CGSize(width: 0, height: 1)
       layer.shadowRadius = 3
 
       addSubview(iconView)
-      addSubview(badgeView)
     }
 
     // MARK: - Configuration
@@ -84,7 +79,7 @@
     override public func prepareForReuse() {
       super.prepareForReuse()
       iconView.image = nil
-      badgeView.backgroundColor = .clear
+      layer.borderColor = UIColor.white.withAlphaComponent(0.4).cgColor
       layer.removeAllAnimations()
       transform = .identity
     }
@@ -97,7 +92,7 @@
     /// Configures the view with the given cluster.
     ///
     /// Called by ``NerveMapView/Coordinator`` after dequeuing to populate
-    /// category color, icon, and credibility badge for the supplied cluster.
+    /// category color, icon, and credibility ring for the supplied cluster.
     ///
     /// - Parameter cluster: The ``NewsCluster`` to render.
     public func configure(with cluster: NewsCluster) {
@@ -115,21 +110,38 @@
       )
       iconView.image = Self.icon(for: item.category)
 
-      // Credibility badge (bottom-right).
-      let badgeSize: CGFloat = 12
-      badgeView.frame = CGRect(
-        x: Self.pinSize - badgeSize,
-        y: Self.pinSize - badgeSize,
-        width: badgeSize, height: badgeSize
-      )
+      // Credibility ring — border color signals the article's trustworthiness.
       if let analysis = item.analysis {
-        badgeView.backgroundColor = ClusterAnnotationView.credibilityColor(
-          for: analysis.credibilityLabel
-        )
-        badgeView.isHidden = false
+        layer.borderColor =
+          ClusterAnnotationView.credibilityColor(
+            for: analysis.credibilityLabel
+          ).cgColor
       } else {
-        badgeView.isHidden = true
+        layer.borderColor = UIColor.white.withAlphaComponent(0.35).cgColor
       }
+    }
+
+    // MARK: - Skeleton
+
+    /// Replaces real content with a pulsing grey placeholder while data loads.
+    public func showSkeleton() {
+      iconView.image = nil
+      backgroundColor = .systemGray4
+      layer.borderColor = UIColor.clear.cgColor
+
+      let pulse = CABasicAnimation(keyPath: "opacity")
+      pulse.fromValue = 1.0
+      pulse.toValue = 0.4
+      pulse.duration = 0.8
+      pulse.autoreverses = true
+      pulse.repeatCount = .infinity
+      pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+      layer.add(pulse, forKey: "skeletonPulse")
+    }
+
+    /// Restores the normal appearance after data has loaded.
+    public func hideSkeleton() {
+      layer.removeAnimation(forKey: "skeletonPulse")
     }
 
     // MARK: - Selection Animation
