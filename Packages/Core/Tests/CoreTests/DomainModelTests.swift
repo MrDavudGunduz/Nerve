@@ -87,10 +87,31 @@ struct DomainModelTests {
     #expect(GeoRegion(center: center, radiusMeters: -1) == nil)
   }
 
-  @Test("GeoRegion accepts zero radius")
+  @Test("GeoRegion rejects zero radius")
   func regionZeroRadius() {
     let center = GeoCoordinate(latitude: 41.0, longitude: 29.0)!
-    #expect(GeoRegion(center: center, radiusMeters: 0) != nil)
+    #expect(GeoRegion(center: center, radiusMeters: 0) == nil)
+  }
+
+  @Test("NerveError cross-case comparison returns false")
+  func nerveErrorCrossCaseInequality() {
+    let network = NerveError.network(message: "x")
+    let storage = NerveError.storage(message: "x")
+    let ai = NerveError.ai(message: "x")
+    let location = NerveError.location(message: "x")
+    let dependency = NerveError.dependency(message: "x")
+    let unknown = NerveError.unknown(message: "x")
+
+    // Same message, different case → must not be equal.
+    #expect(network != storage)
+    #expect(network != ai)
+    #expect(network != location)
+    #expect(network != dependency)
+    #expect(network != unknown)
+    #expect(storage != ai)
+    #expect(storage != location)
+    #expect(ai != dependency)
+    #expect(location != unknown)
   }
 
   // MARK: - Enums

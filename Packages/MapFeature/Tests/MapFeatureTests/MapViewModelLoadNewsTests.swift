@@ -13,6 +13,7 @@
 //
 
 import Core
+import Foundation
 import Testing
 
 @testable import MapFeature

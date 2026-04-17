@@ -81,6 +81,13 @@ public final class MapViewModel {
   /// silently leaked when the view model is torn down.
   private var saveTask: Task<Void, Never>?
 
+  /// Tracked handle for the most-recently-initiated load task.
+  ///
+  /// When a new `loadNews` call arrives, the previous in-flight load is
+  /// cancelled and replaced — eliminating the reentrancy race that the
+  /// simple `isLoading` guard could not prevent.
+  private var loadTask: Task<Void, Never>?
+
   private let logger = Logger(subsystem: "com.davudgunduz.Nerve", category: "MapViewModel")
 
   // MARK: - Dependencies
@@ -139,56 +146,72 @@ public final class MapViewModel {
   ///   - region: The visible map region to load data for.
   ///   - zoomLevel: Current zoom level for clustering granularity.
   public func loadNews(for region: GeoRegion, zoomLevel: Double) async {
-    guard !isLoading else { return }
-    isLoading = true
-    error = nil
-    lastRegion = region
+    // Cancel any in-flight load — the newest call always wins.
+    loadTask?.cancel()
 
-    do {
-      // ── FAST PATH: serve from cache ──
-      let cached = (try? await storageService.fetchNews(in: region, limit: 200, offset: nil)) ?? []
-      if !cached.isEmpty {
-        logger.debug("Cache hit: \(cached.count) items")
-        await updateClusters(with: cached, in: region, zoomLevel: zoomLevel)
+    let task = Task { @MainActor [weak self] in
+      guard let self, !Task.isCancelled else { return }
+      isLoading = true
+      error = nil
+      lastRegion = region
+
+      do {
+        // ── FAST PATH: serve from cache ──
+        let cached =
+          (try? await storageService.fetchNews(in: region, limit: 200, offset: nil)) ?? []
+        guard !Task.isCancelled else { return }
+        if !cached.isEmpty {
+          logger.debug("Cache hit: \(cached.count) items")
+          await updateClusters(with: cached, in: region, zoomLevel: zoomLevel)
+        }
+
+        // ── NETWORK PATH (runs concurrently with cache display) ──
+        let fetched = try await newsService.fetchNews(for: region)
+        guard !Task.isCancelled else { return }
+
+        if !fetched.isEmpty {
+          logger.info("Network: \(fetched.count) items received")
+
+          // Merge: network items take precedence over identical cached items.
+          let allByID = Dictionary(
+            (cached + fetched).map { ($0.id, $0) },
+            uniquingKeysWith: { _, network in network }
+          )
+          let merged = Array(allByID.values)
+          allItems = merged
+          await updateClusters(with: merged, in: region, zoomLevel: zoomLevel)
+
+          // Persist after clustering — cancel any superseded save.
+          scheduleSave(merged)
+        } else if cached.isEmpty {
+          #if DEBUG
+            // Seed data injected ONLY in debug builds for development.
+            logger.info("Empty data — loading seed data for development.")
+            let seed = SeedData.istanbulItems
+            allItems = seed
+            await updateClusters(with: seed, in: region, zoomLevel: zoomLevel)
+            scheduleSave(seed)
+          #else
+            logger.info("No data available for this region.")
+          #endif
+        }
+
+      } catch let nerveError as NerveError {
+        // Network failure is non-fatal if we already have cached data.
+        if clusters.isEmpty {
+          self.error = nerveError
+        }
+        logger.warning("Network fetch failed: \(nerveError.debugDescription)")
+      } catch {
+        if !Task.isCancelled {
+          logger.error("Unexpected error in loadNews: \(error.localizedDescription)")
+        }
       }
 
-      // ── NETWORK PATH (runs concurrently with cache display) ──
-      let fetched = try await newsService.fetchNews(for: region)
-
-      if !fetched.isEmpty {
-        logger.info("Network: \(fetched.count) items received")
-
-        // Merge: network items take precedence over identical cached items.
-        let allByID = Dictionary(
-          (cached + fetched).map { ($0.id, $0) },
-          uniquingKeysWith: { _, network in network }
-        )
-        let merged = Array(allByID.values)
-        allItems = merged
-        await updateClusters(with: merged, in: region, zoomLevel: zoomLevel)
-
-        // Persist after clustering — cancel any superseded save.
-        scheduleSave(merged)
-      } else if cached.isEmpty {
-        // Nothing from cache or network — inject seed data.
-        logger.info("Empty data — loading seed data for development.")
-        let seed = SeedData.istanbulItems
-        allItems = seed
-        await updateClusters(with: seed, in: region, zoomLevel: zoomLevel)
-        scheduleSave(seed)
-      }
-
-    } catch let nerveError as NerveError {
-      // Network failure is non-fatal if we already have cached data.
-      if clusters.isEmpty {
-        self.error = nerveError
-      }
-      logger.warning("Network fetch failed: \(nerveError.debugDescription)")
-    } catch {
-      logger.error("Unexpected error in loadNews: \(error.localizedDescription)")
+      isLoading = false
     }
-
-    isLoading = false
+    loadTask = task
+    await task.value
   }
 
   /// Re-clusters the current item set for a new zoom level without fetching.
@@ -204,6 +227,8 @@ public final class MapViewModel {
   /// Cancels any in-flight background save before clearing state so that
   /// a stale batch cannot be written after the view model has been reset.
   public func reset() {
+    loadTask?.cancel()
+    loadTask = nil
     saveTask?.cancel()
     saveTask = nil
     clusters = []

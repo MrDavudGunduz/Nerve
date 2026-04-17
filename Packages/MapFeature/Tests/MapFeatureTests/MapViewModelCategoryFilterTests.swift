@@ -82,13 +82,26 @@ struct MapViewModelCategoryFilterTests {
     let techItem = TestFixtures.makeItem(id: "tech-1", category: .technology)
     let polItem = TestFixtures.makeItem(id: "pol-1", category: .politics)
 
-    // SpyClusterer records the exact items passed to it.
-    let stubClusterer = SpyClusterer(injected: [techItem, polItem])
-    let vm = MapViewModel(clusterer: stubClusterer)
+    // Wire up a real load path so allItems is populated before the filter test.
+    let newsService = SpyNewsService()
+    await newsService.set(items: [techItem, polItem])
 
+    // SpyClusterer records the exact items passed to it.
+    let spyClusterer = SpyClusterer(injected: [techItem, polItem])
+    let vm = MapViewModel(
+      clusterer: spyClusterer,
+      newsService: newsService,
+      storageService: SpyStorageService(),
+      locationService: StubLocationSvc()
+    )
+
+    // Prime allItems — without this the ViewModel's internal collection is empty.
+    await vm.loadNews(for: region, zoomLevel: 10)
+
+    // Now activate the technology filter and recluster.
     await vm.toggleCategory(.technology, in: region, zoomLevel: 10)
 
-    let lastReceived = await stubClusterer.lastItems
+    let lastReceived = await spyClusterer.lastItems
     let receivedCategories = Set(lastReceived.map { $0.category })
     #expect(
       receivedCategories == [.technology],

@@ -105,7 +105,8 @@ extension NerveError: Equatable {
       return lMsg == rMsg
     case (.unknown(let lMsg, _), .unknown(let rMsg, _)):
       return lMsg == rMsg
-    default:
+    case (.network, _), (.storage, _), (.ai, _),
+      (.location, _), (.dependency, _), (.unknown, _):
       return false
     }
   }

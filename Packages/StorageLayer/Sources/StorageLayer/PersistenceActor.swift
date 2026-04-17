@@ -63,7 +63,7 @@ public actor PersistenceActor {
   ///
   /// - Parameter items: The domain items to persist.
   /// - Throws: If the SwiftData save fails.
-  public func save(_ items: [NewsItem]) throws {
+  public func save(_ items: [NewsItem]) async throws {
     guard !items.isEmpty else { return }
 
     // Fetch all existing records whose IDs match the incoming batch
@@ -118,7 +118,7 @@ public actor PersistenceActor {
   ///   - limit: Maximum number of items to return.
   ///   - offset: Number of items to skip (for pagination).
   /// - Returns: Domain `NewsItem` instances.
-  public func fetch(in region: GeoRegion?, limit: Int?, offset: Int?) throws -> [NewsItem] {
+  public func fetch(in region: GeoRegion?, limit: Int?, offset: Int?) async throws -> [NewsItem] {
     var descriptor = FetchDescriptor<NewsItemPersistenceModel>(
       sortBy: [SortDescriptor(\.publishedAt, order: .reverse)]
     )
@@ -151,7 +151,7 @@ public actor PersistenceActor {
   ///
   /// - Parameter id: The ID of the item to remove.
   /// - Throws: If the SwiftData operation fails.
-  public func delete(id: String) throws {
+  public func delete(id: String) async throws {
     let descriptor = FetchDescriptor<NewsItemPersistenceModel>(
       predicate: #Predicate { $0.id == id }
     )
@@ -168,7 +168,7 @@ public actor PersistenceActor {
   /// storage bounded and data fresh.
   ///
   /// - Throws: If the SwiftData batch-delete or save fails.
-  public func pruneExpired() throws {
+  public func pruneExpired() async throws {
     let expiryDate = Date(timeIntervalSinceNow: -Self.cacheTTL)
     let descriptor = FetchDescriptor<NewsItemPersistenceModel>(
       predicate: #Predicate { $0.cachedAt < expiryDate }

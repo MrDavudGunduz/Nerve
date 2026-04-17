@@ -51,10 +51,18 @@ public struct NewsCluster: Sendable, Identifiable, Hashable {
   public var isCluster: Bool { items.count > 1 }
 
   /// The most frequently occurring category among member items.
+  ///
+  /// When two or more categories share the highest count, the one with
+  /// the alphabetically smallest `rawValue` wins — guaranteeing a
+  /// deterministic result regardless of dictionary iteration order.
   public var dominantCategory: NewsCategory {
     let counts = Dictionary(grouping: items, by: \.category)
       .mapValues(\.count)
-    return counts.max(by: { $0.value < $1.value })?.key ?? .other
+    return counts.max(by: { lhs, rhs in
+      lhs.value == rhs.value
+        ? lhs.key.rawValue > rhs.key.rawValue
+        : lhs.value < rhs.value
+    })?.key ?? .other
   }
 
   /// The headline of the item geographically closest to the cluster centroid.

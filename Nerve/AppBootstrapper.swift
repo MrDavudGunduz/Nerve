@@ -47,7 +47,6 @@ enum AppBootstrapper {
   /// - Parameters:
   ///   - container: The app-wide ``DependencyContainer`` to populate.
   ///   - modelContainer: The SwiftData `ModelContainer` used by ``PersistenceActor``.
-  @MainActor
   static func bootstrap(container: DependencyContainer, modelContainer: ModelContainer) async {
     logger.info("Bootstrapping dependency container…")
 

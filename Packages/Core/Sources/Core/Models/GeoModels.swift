@@ -98,13 +98,13 @@ public struct GeoRegion: Sendable, Codable, Hashable {
 
   /// Creates a region with the given center and radius.
   ///
-  /// Returns `nil` if `radiusMeters` is negative.
+  /// Returns `nil` if `radiusMeters` is zero or negative.
   ///
   /// - Parameters:
   ///   - center: The center point of the region.
-  ///   - radiusMeters: The radius in meters (must be ≥ 0).
+  ///   - radiusMeters: The radius in meters (must be > 0).
   public init?(center: GeoCoordinate, radiusMeters: Double) {
-    guard radiusMeters >= 0 else { return nil }
+    guard radiusMeters > 0 else { return nil }
     self.center = center
     self.radiusMeters = radiusMeters
   }
