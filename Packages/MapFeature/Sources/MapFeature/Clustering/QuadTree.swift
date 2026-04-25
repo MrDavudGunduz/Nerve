@@ -85,7 +85,14 @@ struct BoundingBox: Sendable, Hashable {
 ///   external callers to mutate `entries`/`children` off the actor executor,
 ///   causing a data race. All access is serialized by ``AnnotationClusterer``'s
 ///   actor isolation.
-final class QuadTree<Element: Sendable> {
+///
+/// `@unchecked Sendable` is safe here because:
+///   1. `QuadTree` is only ever created, populated, and queried within
+///      ``AnnotationClusterer``'s actor-isolated methods.
+///   2. No reference to a `QuadTree` escapes the actor boundary.
+///   3. The tree is built per clustering pass and discarded afterward —
+///      it is never shared between concurrent contexts.
+final class QuadTree<Element: Sendable>: @unchecked Sendable {
 
   // MARK: - Types
 

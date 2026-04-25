@@ -68,11 +68,13 @@ public actor PersistenceActor {
 
     // Fetch all existing records whose IDs match the incoming batch
     // in one query — avoids N individual fetches.
+    // Note: errors are propagated (not swallowed) to prevent silent
+    // duplicate insertion on schema corruption or migration failures.
     let incomingIDs = items.map(\.id)
     let existingDescriptor = FetchDescriptor<NewsItemPersistenceModel>(
       predicate: #Predicate { incomingIDs.contains($0.id) }
     )
-    let existing = (try? modelContext.fetch(existingDescriptor)) ?? []
+    let existing = try modelContext.fetch(existingDescriptor)
     let existingByID = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
 
     let now = Date()

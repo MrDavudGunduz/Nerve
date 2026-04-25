@@ -14,6 +14,9 @@ import Foundation
 ///
 /// These items are injected into the cache via ``SwiftDataStorageService``
 /// on first launch when the live network is unavailable (Simulator, offline dev).
+///
+/// Each item includes a pre-computed ``HeadlineAnalysis`` so that credibility
+/// badges are visible immediately without waiting for the AI analysis pipeline.
 public enum SeedData {
 
   /// 20 geolocated Istanbul news items spread across distinct neighborhoods.
@@ -24,7 +27,8 @@ public enum SeedData {
       summary: "Tarihi Galata Köprüsü'nde kapsamlı bir yenileme çalışması bu hafta başladı.",
       source: "İstanbul Büyükşehir",
       category: .other,
-      lat: 41.0162, lon: 28.9741
+      lat: 41.0162, lon: 28.9741,
+      clickbait: 0.12, sentiment: .neutral, confidence: 0.88
     ),
     make(
       id: "seed-002",
@@ -32,7 +36,8 @@ public enum SeedData {
       summary: "Araştırmacılar doğal dil işlemede çığır açan bir model geliştirdi.",
       source: "BÜ Haber",
       category: .technology,
-      lat: 41.0833, lon: 29.0500
+      lat: 41.0833, lon: 29.0500,
+      clickbait: 0.18, sentiment: .positive, confidence: 0.92
     ),
     make(
       id: "seed-003",
@@ -40,7 +45,8 @@ public enum SeedData {
       summary: "Tarihi çarşı bu yılın ilk çeyreğinde 3 milyon ziyaretçiye ulaştı.",
       source: "Turizm Türkiye",
       category: .business,
-      lat: 41.0108, lon: 28.9680
+      lat: 41.0108, lon: 28.9680,
+      clickbait: 0.35, sentiment: .positive, confidence: 0.80
     ),
     make(
       id: "seed-004",
@@ -49,7 +55,8 @@ public enum SeedData {
         "Vodafone Park'ta oynacak kritik derbi öncesi iki takım da son hazırlıklarını tamamladı.",
       source: "Spor Arena",
       category: .sports,
-      lat: 41.0390, lon: 29.0056
+      lat: 41.0390, lon: 29.0056,
+      clickbait: 0.22, sentiment: .neutral, confidence: 0.85
     ),
     make(
       id: "seed-005",
@@ -57,15 +64,17 @@ public enum SeedData {
       summary: "M4 hattının uzatılmasıyla Kadıköy bağlantısı güçlendirildi.",
       source: "Metro İstanbul",
       category: .other,
-      lat: 40.9900, lon: 29.0230
+      lat: 40.9900, lon: 29.0230,
+      clickbait: 0.10, sentiment: .positive, confidence: 0.90
     ),
     make(
       id: "seed-006",
-      headline: "Türk Teknoloji Girişimleri Avrupa'yı Fethedyor",
+      headline: "Türk Teknoloji Girişimleri Avrupa'yı Fethediyor",
       summary: "İstanbul merkezli 5 startup bu yıl 500 milyon dolar yatırım aldı.",
       source: "TechTR",
       category: .technology,
-      lat: 41.0571, lon: 28.9967
+      lat: 41.0571, lon: 28.9967,
+      clickbait: 0.45, sentiment: .positive, confidence: 0.78
     ),
     make(
       id: "seed-007",
@@ -73,7 +82,8 @@ public enum SeedData {
       summary: "Bizans dönemine ait mozaikler hassas tekniklerle restore ediliyor.",
       source: "Kültür Bakanlığı",
       category: .entertainment,
-      lat: 41.0086, lon: 28.9802
+      lat: 41.0086, lon: 28.9802,
+      clickbait: 0.08, sentiment: .neutral, confidence: 0.93
     ),
     make(
       id: "seed-008",
@@ -81,7 +91,8 @@ public enum SeedData {
       summary: "BIST 100 endeksi Nisan ayında tarihi zirvesini gördü.",
       source: "Bloomberg HT",
       category: .business,
-      lat: 41.0422, lon: 28.9876
+      lat: 41.0422, lon: 28.9876,
+      clickbait: 0.30, sentiment: .positive, confidence: 0.82
     ),
     make(
       id: "seed-009",
@@ -89,7 +100,8 @@ public enum SeedData {
       summary: "Yüzlerce gönüllü sahil temizleme etkinliğinde bir araya geldi.",
       source: "Üsküdar Belediyesi",
       category: .environment,
-      lat: 41.0228, lon: 29.0153
+      lat: 41.0228, lon: 29.0153,
+      clickbait: 0.05, sentiment: .positive, confidence: 0.95
     ),
     make(
       id: "seed-010",
@@ -97,7 +109,8 @@ public enum SeedData {
       summary: "Sarı-kırmızılılar Son 16 turuna yükselerek tarihi başarı elde etti.",
       source: "Fanatik",
       category: .sports,
-      lat: 41.0651, lon: 28.9833
+      lat: 41.0651, lon: 28.9833,
+      clickbait: 0.28, sentiment: .positive, confidence: 0.87
     ),
     make(
       id: "seed-011",
@@ -105,7 +118,8 @@ public enum SeedData {
       summary: "3. pist açılışıyla günlük uçuş kapasitesi 2.000'e çıktı.",
       source: "Havacılık Türkiye",
       category: .business,
-      lat: 41.2753, lon: 28.7519
+      lat: 41.2753, lon: 28.7519,
+      clickbait: 0.15, sentiment: .neutral, confidence: 0.89
     ),
     make(
       id: "seed-012",
@@ -113,7 +127,8 @@ public enum SeedData {
       summary: "Taksim Meydanı'nın yeni peyzaj düzenlemesi bugün açıldı.",
       source: "Beyoğlu Belediyesi",
       category: .other,
-      lat: 41.0369, lon: 28.9850
+      lat: 41.0369, lon: 28.9850,
+      clickbait: 0.11, sentiment: .positive, confidence: 0.91
     ),
     make(
       id: "seed-013",
@@ -121,7 +136,8 @@ public enum SeedData {
       summary: "BUDO, Boğaz'ı boydan boya kapsayan yeni deniz ulaşım hattını tanıttı.",
       source: "Deniz Haberleri",
       category: .other,
-      lat: 41.0450, lon: 29.0300
+      lat: 41.0450, lon: 29.0300,
+      clickbait: 0.20, sentiment: .neutral, confidence: 0.86
     ),
     make(
       id: "seed-014",
@@ -129,7 +145,8 @@ public enum SeedData {
       summary: "Meme kanseri teşhisinde yüzde 95 doğrulukla çalışan AI modeli tanıtıldı.",
       source: "Sağlık Haberleri",
       category: .health,
-      lat: 41.0200, lon: 28.9512
+      lat: 41.0200, lon: 28.9512,
+      clickbait: 0.25, sentiment: .positive, confidence: 0.84
     ),
     make(
       id: "seed-015",
@@ -137,15 +154,17 @@ public enum SeedData {
       summary: "Osmanlı dönemine ait nadir eserler ilk kez ziyaretçilerle buluşuyor.",
       source: "Müzeler Türkiye",
       category: .entertainment,
-      lat: 41.0393, lon: 29.0009
+      lat: 41.0393, lon: 29.0009,
+      clickbait: 0.14, sentiment: .positive, confidence: 0.90
     ),
     make(
       id: "seed-016",
-      headline: "Maltepe Sahili'nde Deprem Tatbikatı",
+      headline: "İNANILMAZ! Maltepe Sahili'nde Deprem Tatbikatı HERKESİ ŞOK ETTİ!!!",
       summary: "8.0 şiddetinde senaryo ile kapsamlı tatbikat gerçekleştirildi.",
       source: "AFAD İstanbul",
       category: .other,
-      lat: 40.9342, lon: 29.1292
+      lat: 40.9342, lon: 29.1292,
+      clickbait: 0.82, sentiment: .negative, confidence: 0.75
     ),
     make(
       id: "seed-017",
@@ -153,7 +172,8 @@ public enum SeedData {
       summary: "500 girişime ev sahipliği yapacak kampüs yıl sonunda kapılarını açıyor.",
       source: "TechPark TR",
       category: .technology,
-      lat: 41.1672, lon: 29.0553
+      lat: 41.1672, lon: 29.0553,
+      clickbait: 0.16, sentiment: .positive, confidence: 0.88
     ),
     make(
       id: "seed-018",
@@ -161,15 +181,17 @@ public enum SeedData {
       summary: "18. İstanbul Bienali dünyadan 60 ülkenin sanatçısını bir araya getiriyor.",
       source: "Sanat Dünyası",
       category: .entertainment,
-      lat: 41.0290, lon: 28.9723
+      lat: 41.0290, lon: 28.9723,
+      clickbait: 0.09, sentiment: .positive, confidence: 0.94
     ),
     make(
       id: "seed-019",
-      headline: "Pendik'te Raylı Sistem İhalesi",
+      headline: "You Won't Believe What Happened at Pendik Railway Auction!!",
       summary: "Sabiha Gökçen – Pendik metrosu için ihale süreci başlatıldı.",
       source: "Ulaştırma Bakanlığı",
       category: .politics,
-      lat: 40.8780, lon: 29.2320
+      lat: 40.8780, lon: 29.2320,
+      clickbait: 0.91, sentiment: .neutral, confidence: 0.70
     ),
     make(
       id: "seed-020",
@@ -177,7 +199,8 @@ public enum SeedData {
       summary: "Kış aylarında PM2.5 değerleri WHO sınırlarının 3 katına ulaştı.",
       source: "Çevre Bakanlığı",
       category: .health,
-      lat: 41.0130, lon: 28.9550
+      lat: 41.0130, lon: 28.9550,
+      clickbait: 0.38, sentiment: .negative, confidence: 0.81
     ),
   ]
 
@@ -190,7 +213,10 @@ public enum SeedData {
     source: String,
     category: NewsCategory,
     lat: Double,
-    lon: Double
+    lon: Double,
+    clickbait: Double = 0.0,
+    sentiment: Sentiment = .neutral,
+    confidence: Double = 0.85
   ) -> NewsItem {
     NewsItem(
       id: id,
@@ -199,7 +225,12 @@ public enum SeedData {
       source: source,
       category: category,
       coordinate: GeoCoordinate(latitude: lat, longitude: lon)!,
-      publishedAt: Date(timeIntervalSinceNow: -Double.random(in: 0...86400))
+      publishedAt: Date(timeIntervalSinceNow: -Double.random(in: 0...86400)),
+      analysis: HeadlineAnalysis(
+        clickbaitScore: clickbait,
+        sentiment: sentiment,
+        confidence: confidence
+      )
     )
   }
 }

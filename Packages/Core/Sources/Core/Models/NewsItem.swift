@@ -49,7 +49,7 @@ public enum NewsCategory: String, Sendable, Codable, CaseIterable {
 ///
 /// - Note: This is a **domain transfer object**, not a persistence model.
 ///   `StorageLayer` defines its own `@Model` schema that maps to/from this type.
-public struct NewsItem: Sendable, Codable, Hashable, Identifiable {
+public struct NewsItem: Sendable, Codable, Identifiable {
 
   /// Unique identifier for the news item, sourced from the upstream API.
   ///
@@ -112,5 +112,52 @@ public struct NewsItem: Sendable, Codable, Hashable, Identifiable {
     self.publishedAt = publishedAt
     self.imageURL = imageURL
     self.analysis = analysis
+  }
+
+  // MARK: - Convenience
+
+  /// Returns a copy of this item with the given analysis attached.
+  ///
+  /// Use this instead of manually reconstructing a `NewsItem` after AI
+  /// enrichment — it is resilient to future property additions.
+  ///
+  /// ```swift
+  /// let enriched = item.withAnalysis(headlineAnalysis)
+  /// ```
+  public func withAnalysis(_ analysis: HeadlineAnalysis) -> NewsItem {
+    NewsItem(
+      id: id,
+      headline: headline,
+      summary: summary,
+      source: source,
+      articleURL: articleURL,
+      category: category,
+      coordinate: coordinate,
+      publishedAt: publishedAt,
+      imageURL: imageURL,
+      analysis: analysis
+    )
+  }
+}
+
+// MARK: - Equatable
+
+/// Identity-based equality: two `NewsItem`s are equal if they share the same `id`.
+///
+/// This prevents unnecessary UI diffing (e.g., annotation re-rendering in MapKit)
+/// when only the `analysis` result changes after AI enrichment. Auto-synthesized
+/// `Equatable` would compare *all* properties, causing spurious inequality.
+extension NewsItem: Equatable {
+  public static func == (lhs: NewsItem, rhs: NewsItem) -> Bool {
+    lhs.id == rhs.id
+  }
+}
+
+// MARK: - Hashable
+
+/// Identity-based hashing consistent with the custom `Equatable` above.
+extension NewsItem: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
   }
 }

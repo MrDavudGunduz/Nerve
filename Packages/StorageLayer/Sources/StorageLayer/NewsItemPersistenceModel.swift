@@ -35,6 +35,27 @@ import SwiftData
 @Model
 public final class NewsItemPersistenceModel {
 
+  // MARK: - Indexes (Future)
+
+  /// Desired database indexes for spatial fetch queries and TTL pruning.
+  ///
+  /// SwiftData (iOS 17) does not expose a public API for declarative index
+  /// creation. The framework creates implicit indexes only for
+  /// `@Attribute(.unique)` properties (e.g., ``id``).
+  ///
+  /// When the project's minimum deployment target is raised to iOS 18+,
+  /// add the following indexes using the `#Index` macro:
+  ///
+  /// ```swift
+  /// #Index<NewsItemPersistenceModel>([\.latitude, \.longitude])
+  /// #Index<NewsItemPersistenceModel>([\.publishedAt])
+  /// #Index<NewsItemPersistenceModel>([\.cachedAt])
+  /// ```
+  ///
+  /// Without explicit indexes, SwiftData performs full table scans on every
+  /// region-filtered fetch — this becomes noticeable when the local
+  /// store grows beyond a few hundred items.
+
   // MARK: - Stored Properties
 
   /// Unique identifier matching `NewsItem.id`.
@@ -45,6 +66,11 @@ public final class NewsItemPersistenceModel {
   public var headline: String
 
   /// A brief summary of the article.
+  ///
+  /// Stored externally via `@Attribute(.externalStorage)` to keep the main
+  /// SQLite row compact when summaries grow large. SwiftData transparently
+  /// manages the side file and loads it on demand.
+  @Attribute(.externalStorage)
   public var summary: String
 
   /// The publication or news source name.

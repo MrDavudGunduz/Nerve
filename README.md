@@ -20,13 +20,13 @@
 
 ### Key Pillars
 
-| Pillar                               | Description                                                              |
-| ------------------------------------ | ------------------------------------------------------------------------ |
-| 🗺️ **Map-First Discovery**           | Explore news geographically on an interactive, clustered map             |
-| 🔒 **Privacy-First AI**              | CoreML-powered clickbait detection & sentiment analysis — 100% on-device |
-| ✈️ **Offline-First**                 | Full functionality without internet via SwiftData persistence            |
-| 🥽 **Spatial Computing**             | Volumetric 3D models & immersive map on visionOS                         |
-| 📱 **One Codebase, Three Platforms** | iOS · macOS · visionOS powered by Swift Package Manager                  |
+| Pillar                               | Description                                                         |
+| ------------------------------------ | ------------------------------------------------------------------- |
+| 🗺️ **Map-First Discovery**           | Explore news geographically on an interactive, clustered map        |
+| 🔒 **Privacy-First AI**              | NLTagger sentiment & heuristic clickbait detection — 100% on-device |
+| ✈️ **Offline-First**                 | Full functionality without internet via SwiftData persistence       |
+| 🥽 **Spatial Computing**             | Volumetric 3D models & immersive map on visionOS                    |
+| 📱 **One Codebase, Three Platforms** | iOS · macOS · visionOS powered by Swift Package Manager             |
 
 ---
 
@@ -41,10 +41,11 @@
 
 ### 🤖 On-Device AI Analysis
 
-- **Clickbait Detection** — binary classification scoring each headline's credibility.
-- **Sentiment Analysis** — categorizes headlines as positive, neutral, or negative.
+- **Clickbait Detection** — 6-signal weighted heuristic engine scoring headline credibility (capitalization, punctuation, trigger phrases, listicle patterns, emotional words, length analysis).
+- **Sentiment Analysis** — Apple NaturalLanguage `NLTagger` with `.sentimentScore` scheme supporting 50+ languages.
 - Color-coded credibility badges on every annotation (✅ Verified · ⚠️ Caution · 🚫 Clickbait).
-- Filter controls to hide low-credibility stories.
+- Background `TaskGroup`-based batch analysis pipeline with bounded concurrency.
+- Filter controls to hide low-credibility stories from the map.
 
 ### ✈️ Offline-First Architecture
 
@@ -84,7 +85,7 @@ Nerve/
     ├── StorageLayer/    → SwiftData schemas, persistence actors
     ├── MapFeature/      → Map UI, clustering engine, location services
     ├── ARFeature/       → RealityKit scenes, USDZ management, AR sessions
-    └── AILayer/         → CoreML inference, NLP pipelines, scoring engine
+    └── AILayer/         → NLTagger sentiment, heuristic clickbait engine, scoring pipeline
 ```
 
 ### Data Flow
@@ -97,8 +98,8 @@ flowchart LR
     SD -->|Query| UI["SwiftUI Views"]
     UI -->|"Region Δ"| CE["ClusterEngine"]
     CE -->|Clustered| UI
-    PA -->|New Items| AI["AILayer"]
-    AI -->|Analysis| PA
+    PA -->|New Items| AI["AILayer (NLTagger + Heuristic)"]
+    AI -->|HeadlineAnalysis| PA
 ```
 
 ### Design Principles
@@ -112,21 +113,21 @@ flowchart LR
 
 ## Tech Stack
 
-| Category         | Technology                                          |
-| ---------------- | --------------------------------------------------- |
-| **Language**     | Swift 6.0 (Strict Concurrency)                      |
-| **UI Framework** | SwiftUI                                             |
-| **Persistence**  | SwiftData                                           |
-| **Maps**         | MapKit, CoreLocation                                |
-| **AI / ML**      | CoreML, NaturalLanguage                             |
-| **3D / AR**      | RealityKit, ARKit                                   |
-| **Spatial**      | visionOS Volumes & Immersive Spaces                 |
-| **Concurrency**  | Swift Concurrency (async/await, Actors, TaskGroups) |
-| **Reactivity**   | Observation Framework (`@Observable`)               |
-| **Modularity**   | Swift Package Manager (local packages)              |
-| **Testing**      | Swift Testing (`@Test`), XCUITest                   |
-| **Profiling**    | Xcode Instruments (Leaks, Metal System Trace)       |
-| **Linting**      | SwiftLint                                           |
+| Category         | Technology                                                  |
+| ---------------- | ----------------------------------------------------------- |
+| **Language**     | Swift 6.0 (Strict Concurrency)                              |
+| **UI Framework** | SwiftUI                                                     |
+| **Persistence**  | SwiftData                                                   |
+| **Maps**         | MapKit, CoreLocation                                        |
+| **AI / ML**      | NaturalLanguage (NLTagger), Heuristic Engine (CoreML-ready) |
+| **3D / AR**      | RealityKit, ARKit                                           |
+| **Spatial**      | visionOS Volumes & Immersive Spaces                         |
+| **Concurrency**  | Swift Concurrency (async/await, Actors, TaskGroups)         |
+| **Reactivity**   | Observation Framework (`@Observable`)                       |
+| **Modularity**   | Swift Package Manager (local packages)                      |
+| **Testing**      | Swift Testing (`@Test`), XCUITest                           |
+| **Profiling**    | Xcode Instruments (Leaks, Metal System Trace)               |
+| **Linting**      | SwiftLint                                                   |
 
 ---
 
@@ -227,7 +228,10 @@ Nerve/
 │   │       └── ModelRegistry.swift      # Centralized @Model registry
 │   ├── MapFeature/                     # MapKit map module
 │   ├── ARFeature/                      # RealityKit / ARKit module
-│   └── AILayer/                        # CoreML intelligence module
+│   └── AILayer/                        # NLP inference module
+│       └── Sources/AILayer/
+│           ├── AILayer.swift           # Module namespace (v1.0.0)
+│           └── HeadlineAnalyzer.swift  # Actor: NLTagger sentiment + heuristic clickbait
 │
 ├── NerveTests/                         # App-level integration tests
 ├── NerveUITests/                       # UI automation tests
@@ -272,7 +276,7 @@ See [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) for the full 5-phase implem
 | ----- | ----------------------------------------------- | -------- |
 | **1** | Multiplatform Architecture & Modular Foundation | Week 1   |
 | **2** | Map-First Exploration & Offline-First           | Week 2   |
-| **3** | On-Device AI with CoreML                        | Week 3   |
+| **3** | On-Device AI (NLTagger + Heuristic Engine)      | Week 3   |
 | **4** | RealityKit & visionOS Spatial UI                | Week 4   |
 | **5** | QA, Testing & Optimization                      | Week 5   |
 

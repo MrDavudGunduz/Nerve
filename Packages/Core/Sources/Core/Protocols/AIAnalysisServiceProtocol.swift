@@ -9,8 +9,11 @@ import Foundation
 
 /// Abstraction for on-device AI analysis of news headlines.
 ///
-/// Concrete implementations use CoreML in `AILayer` for clickbait
-/// detection and sentiment scoring on the Neural Processing Unit.
+/// The default concrete implementation in `AILayer` uses Apple's `NLTagger`
+/// for sentiment analysis and a weighted heuristic engine for clickbait
+/// detection — all processing runs entirely on-device with zero network calls.
+/// The protocol boundary allows future replacements (e.g., CoreML models)
+/// without breaking dependents.
 public protocol AIAnalysisServiceProtocol: Sendable {
 
   /// Analyzes a single headline for clickbait likelihood and sentiment.

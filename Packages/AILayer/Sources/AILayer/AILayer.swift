@@ -14,5 +14,5 @@ import Core
 public enum AILayer {
 
   /// The current version of the AILayer module.
-  public static let version = "0.1.0"
+  public static let version = "1.0.0"
 }

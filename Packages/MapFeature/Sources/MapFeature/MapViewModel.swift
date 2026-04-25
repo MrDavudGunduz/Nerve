@@ -88,6 +88,11 @@ public final class MapViewModel {
   /// simple `isLoading` guard could not prevent.
   private var loadTask: Task<Void, Never>?
 
+  /// Tracked handle for the background AI analysis task.
+  ///
+  /// Cancelled on reset or when a new load supersedes the current analysis.
+  private var analyzeTask: Task<Void, Never>?
+
   private let logger = Logger(subsystem: "com.davudgunduz.Nerve", category: "MapViewModel")
 
   // MARK: - Dependencies
@@ -96,6 +101,7 @@ public final class MapViewModel {
   private let newsService: any NewsServiceProtocol
   private let storageService: any StorageServiceProtocol
   private let locationService: any LocationServiceProtocol
+  private let aiService: (any AIAnalysisServiceProtocol)?
 
   // MARK: - Init
 
@@ -104,12 +110,14 @@ public final class MapViewModel {
     clusterer: any ClusteringServiceProtocol,
     newsService: any NewsServiceProtocol,
     storageService: any StorageServiceProtocol,
-    locationService: any LocationServiceProtocol
+    locationService: any LocationServiceProtocol,
+    aiService: (any AIAnalysisServiceProtocol)? = nil
   ) {
     self.clusterer = clusterer
     self.newsService = newsService
     self.storageService = storageService
     self.locationService = locationService
+    self.aiService = aiService
   }
 
   /// Convenience init with explicit clusterer — used in tests and previews
@@ -119,6 +127,7 @@ public final class MapViewModel {
     self.newsService = StubNewsServiceInternal()
     self.storageService = StubStorageServiceInternal()
     self.locationService = StubLocationServiceInternal()
+    self.aiService = nil
   }
 
   // MARK: - Public API
@@ -183,6 +192,9 @@ public final class MapViewModel {
 
           // Persist after clustering — cancel any superseded save.
           scheduleSave(merged)
+
+          // Enqueue background AI analysis for un-analyzed items.
+          scheduleAnalysis(merged, in: region, zoomLevel: zoomLevel)
         } else if cached.isEmpty {
           #if DEBUG
             // Seed data injected ONLY in debug builds for development.
@@ -191,6 +203,9 @@ public final class MapViewModel {
             allItems = seed
             await updateClusters(with: seed, in: region, zoomLevel: zoomLevel)
             scheduleSave(seed)
+
+            // Analyze seed items for immediate credibility badges.
+            scheduleAnalysis(seed, in: region, zoomLevel: zoomLevel)
           #else
             logger.info("No data available for this region.")
           #endif
@@ -231,6 +246,8 @@ public final class MapViewModel {
     loadTask = nil
     saveTask?.cancel()
     saveTask = nil
+    analyzeTask?.cancel()
+    analyzeTask = nil
     clusters = []
     allItems = []
     error = nil
@@ -301,6 +318,66 @@ public final class MapViewModel {
         logger.debug("Persisted \(items.count) items to storage.")
       } catch {
         logger.warning("Background save failed: \(error.localizedDescription)")
+      }
+    }
+  }
+
+  /// Schedules background AI analysis for items that lack an `analysis` result.
+  ///
+  /// After analysis completes, the enriched items are merged back into `allItems`,
+  /// persisted, and re-clustered so credibility badges appear on the map.
+  ///
+  /// - Parameters:
+  ///   - items: The full set of items to check for analysis.
+  ///   - region: The current visible region (for re-clustering after analysis).
+  ///   - zoomLevel: The current zoom level.
+  private func scheduleAnalysis(
+    _ items: [NewsItem],
+    in region: GeoRegion,
+    zoomLevel: Double
+  ) {
+    guard let aiService else { return }
+
+    let unanalyzed = items.filter { $0.analysis == nil }
+    guard !unanalyzed.isEmpty else {
+      logger.debug("All \(items.count) items already analyzed — skipping.")
+      return
+    }
+
+    analyzeTask?.cancel()
+    analyzeTask = Task(priority: .userInitiated) { @MainActor [weak self] in
+      guard let self, !Task.isCancelled else { return }
+      logger.info("Starting AI analysis for \(unanalyzed.count) items…")
+
+      do {
+        let headlines = unanalyzed.map(\.headline)
+        let analyses = try await aiService.analyzeBatch(headlines)
+        guard !Task.isCancelled else { return }
+
+        // Enrich items with analysis results using the copy-on-write helper.
+        // `withAnalysis(_:)` is resilient to future property additions on NewsItem.
+        let enriched = zip(unanalyzed, analyses).map { item, analysis in
+          item.withAnalysis(analysis)
+        }
+
+        // Merge enriched items back into allItems.
+        var itemsByID = Dictionary(allItems.map { ($0.id, $0) }, uniquingKeysWith: { _, b in b })
+        for item in enriched {
+          itemsByID[item.id] = item
+        }
+        allItems = Array(itemsByID.values)
+
+        // Re-cluster to refresh credibility badges.
+        await updateClusters(with: filteredItems, in: region, zoomLevel: zoomLevel)
+
+        // Persist enriched items.
+        scheduleSave(Array(itemsByID.values))
+
+        logger.info("AI analysis complete: \(enriched.count) items enriched.")
+      } catch {
+        if !Task.isCancelled {
+          logger.warning("AI analysis failed: \(error.localizedDescription)")
+        }
       }
     }
   }

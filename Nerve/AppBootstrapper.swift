@@ -5,6 +5,7 @@
 //  Created by Davud Gunduz on 11.04.2026.
 //
 
+import AILayer
 import Core
 import MapFeature
 import OSLog
@@ -72,11 +73,11 @@ enum AppBootstrapper {
       SwiftDataStorageService(persistenceActor: persistenceActor)
     }
 
-    // MARK: - AI Analysis (Stub)
+    // MARK: - AI Analysis (On-Device NLP)
 
-    // TODO: Replace with CoreMLAnalysisService once AILayer model is added.
+    // Production: actor-isolated NLTagger sentiment + heuristic clickbait detection.
     await container.register(AIAnalysisServiceProtocol.self, lifetime: .singleton) {
-      StubAIAnalysisService()
+      HeadlineAnalyzer()
     }
 
     // MARK: - Location (CoreLocation)
@@ -113,20 +114,5 @@ private struct StubNewsService: NewsServiceProtocol {
       message:
         "StubNewsService does not support fetchNewsDetail(id:). Implement NetworkNewsService."
     )
-  }
-}
-
-// MARK: StubAIAnalysisService
-
-private struct StubAIAnalysisService: AIAnalysisServiceProtocol {
-
-  func analyzeHeadline(_ headline: String) async throws -> HeadlineAnalysis {
-    HeadlineAnalysis(clickbaitScore: 0.0, sentiment: .neutral, confidence: 0.0)
-  }
-
-  func analyzeBatch(_ headlines: [String]) async throws -> [HeadlineAnalysis] {
-    headlines.map { _ in
-      HeadlineAnalysis(clickbaitScore: 0.0, sentiment: .neutral, confidence: 0.0)
-    }
   }
 }

@@ -54,10 +54,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `AILayer`: Protocol conformance stub (`StubAIAnalysisService`) + DI round-trip + batch analysis.
   - `NerveTests`: App-level integration tests with Swift Testing migration.
 
-- Project documentation: `README.md`, `DEVELOPMENT_ROADMAP.md`, `CONTRIBUTING.md`, `CHANGELOG.md`.
-- Architecture Decision Records (ADRs) for SwiftData, SPM modularity, offline-first, CoreML, Observation framework.
-- GitHub Pull Request template.
-- MIT License.
+- **On-Device AI Engine** (`AILayer/HeadlineAnalyzer.swift`)
+  - `HeadlineAnalyzer` actor implementing `AIAnalysisServiceProtocol`.
+  - **Sentiment Analysis** via Apple NaturalLanguage `NLTagger` with `.sentimentScore` (50+ languages).
+  - **Clickbait Detection** via 6-signal weighted heuristic engine: capitalization, punctuation, trigger phrases, listicle patterns, emotional words, length analysis.
+  - Bilingual clickbait phrase libraries (English + Turkish).
+  - Batch analysis with bounded `TaskGroup` concurrency (`maxConcurrency = 4`).
+  - `AILayer` module version bumped to `1.0.0`.
+
+- **AI Analysis Pipeline Integration** (`MapFeature/MapViewModel.swift`)
+  - `scheduleAnalysis()` method: background-enqueues un-analyzed items after `loadNews()` completes.
+  - Enriches items with `HeadlineAnalysis`, re-clusters for credibility badge refresh, persists results.
+  - `analyzeTask` lifecycle managed with cancellation on `reset()` and new load.
+  - `aiService` added as optional dependency (nil-safe for tests/previews).
+
+- **SeedData Enrichment** (`MapFeature/SeedData.swift`)
+  - All 20 Istanbul seed items now include pre-computed `HeadlineAnalysis`.
+  - Mix of verified (low clickbait), caution, and clickbait scores for realistic visual feedback.
+  - Two intentionally clickbait headlines (seed-016, seed-019) for testing credibility badges.
+
+- **DI Registration** (`Nerve/AppBootstrapper.swift`)
+  - `StubAIAnalysisService` replaced with production `HeadlineAnalyzer`.
+  - `import AILayer` added to app-level bootstrapper.
+
+- **Comprehensive AI Test Suite** (24 tests, 6 suites)
+  - Clickbait detection: genuine vs clickbait, ALL CAPS, punctuation, listicles, emotional words, Turkish, value clamping.
+  - Sentiment analysis: neutral, valid enum cases, confidence range.
+  - Batch analysis: count, empty, ordering, 50-item large batch.
+  - Edge cases: empty string, whitespace, 500+ char, non-Latin (Arabic), emoji.
+  - DI integration: `DependencyContainer` round-trip resolution.
+  - Module version assertion (`1.0.0`).
+
+- Project documentation: `README.md`, `DEVELOPMENT_ROADMAP.md`, `CHANGELOG.md` updated for Phase 3.
 
 ### Fixed
 

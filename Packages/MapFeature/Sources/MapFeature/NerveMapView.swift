@@ -248,12 +248,18 @@
       }
 
       // ── User Location Pulse Ring ──
-      if let coord = viewModel.userLocation {
+      // Only update the overlay when the user's location has actually changed
+      // to avoid unnecessary remove/add churn on every @Observable mutation.
+      if let coord = viewModel.userLocation,
+        coord != context.coordinator.lastUserLocation
+      {
+        context.coordinator.lastUserLocation = coord
         let clCoord = CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude)
-        let overlays = mapView.overlays.compactMap { $0 as? MKCircle }
-        if overlays.isEmpty {
-          mapView.addOverlay(MKCircle(center: clCoord, radius: 150), level: .aboveRoads)
+        let existingCircles = mapView.overlays.compactMap { $0 as? MKCircle }
+        if !existingCircles.isEmpty {
+          mapView.removeOverlays(existingCircles)
         }
+        mapView.addOverlay(MKCircle(center: clCoord, radius: 150), level: .aboveRoads)
       }
 
       // ── Loading Indicator ──
@@ -314,6 +320,10 @@
 
       /// Tracks the last interface style to avoid redundant map config updates.
       var lastInterfaceStyle: UIUserInterfaceStyle = .unspecified
+
+      /// Tracks the last user location to avoid redundant overlay remove/add
+      /// cycles on every `@Observable` state mutation.
+      var lastUserLocation: GeoCoordinate?
 
       // MARK: - Init
 
@@ -453,12 +463,51 @@
         }
       }
 
+      // MARK: - MKMapViewDelegate: Overlay Rendering
+
+      /// Provides renderers for map overlays.
+      ///
+      /// Returns a styled `MKCircleRenderer` for the user-location pulse ring.
+      /// Without this method, `MKCircle` overlays are silently not rendered.
+      public func mapView(
+        _ mapView: MKMapView,
+        rendererFor overlay: MKOverlay
+      ) -> MKOverlayRenderer {
+        if let circle = overlay as? MKCircle {
+          let renderer = MKCircleRenderer(circle: circle)
+          renderer.fillColor = UIColor.systemBlue.withAlphaComponent(0.08)
+          renderer.strokeColor = UIColor.systemBlue.withAlphaComponent(0.25)
+          renderer.lineWidth = 1.0
+          return renderer
+        }
+        return MKOverlayRenderer(overlay: overlay)
+      }
+
       // MARK: - MKMapViewDelegate: Selection
 
-      /// Forwards the selection event to the annotation view's spring animation.
+      /// Presents a ``NewsDetailSheet`` when any news annotation is selected.
+      ///
+      /// For single-item annotations, a selection spring animation is also played.
+      /// The sheet is presented via `UISheetPresentationController` with
+      /// `.medium()` and `.large()` detents for a native bottom-sheet UX.
       public func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
-        guard let newsView = view as? NewsAnnotationView else { return }
-        newsView.setSelected(true, animated: true)
+        guard let newsAnnotation = view.annotation as? NewsAnnotation else { return }
+
+        // Single-pin selection animation.
+        if let newsView = view as? NewsAnnotationView {
+          newsView.setSelected(true, animated: true)
+        }
+
+        // Present the detail sheet for both single items and clusters.
+        let sheet = NewsDetailSheet(cluster: newsAnnotation.cluster)
+        sheet.modalPresentationStyle = .pageSheet
+        if let sheetController = sheet.sheetPresentationController {
+          sheetController.detents = [.medium(), .large()]
+          sheetController.prefersGrabberVisible = true
+          sheetController.preferredCornerRadius = 20
+        }
+
+        mapView.viewController?.present(sheet, animated: true)
       }
 
       /// Reverses the selection animation when the annotation is deselected.

@@ -1,6 +1,6 @@
 # Contributing to Nerve
 
-> **Last Updated:** March 31, 2026  
+> **Last Updated:** April 19, 2026  
 > **Project Overview:** See [README.md](README.md)
 
 ---
@@ -221,12 +221,13 @@ All `public` symbols in SPM packages must have `///` documentation comments foll
 ```swift
 /// Analyzes a news headline for clickbait indicators and sentiment.
 ///
-/// Runs inference on-device using CoreML, with no network calls required.
-/// Results are cached alongside the `NewsItem` in SwiftData.
+/// Runs inference entirely on-device using Apple's NaturalLanguage
+/// framework for sentiment and a weighted heuristic engine for clickbait
+/// detection. Zero network calls required.
 ///
 /// - Parameter headline: The raw headline text to analyze.
 /// - Returns: A ``HeadlineAnalysis`` containing clickbait score, sentiment, and confidence.
-/// - Throws: ``AILayerError/modelNotLoaded`` if the CoreML model failed to initialize.
+/// - Throws: ``NerveError/ai(message:context:)`` on analysis failure.
 public func analyzeHeadline(_ headline: String) async throws -> HeadlineAnalysis
 ```
 

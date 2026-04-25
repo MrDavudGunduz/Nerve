@@ -83,13 +83,12 @@
       label.text = message
       dismissTimer?.invalidate()
       UIView.animate(withDuration: 0.25) { self.alpha = 1 }
-      dismissTimer = Timer(
-        timeInterval: 4,
-        target: self,
-        selector: #selector(dismiss),
-        userInfo: nil,
-        repeats: false
-      )
+      // Block-based timer avoids a retain cycle: the previous target-action
+      // form held `self` strongly, preventing deallocation if the banner was
+      // removed from the view hierarchy before the timer fired.
+      dismissTimer = Timer(timeInterval: 4, repeats: false) { [weak self] _ in
+        self?.dismiss()
+      }
       // Schedule on .common so the timer fires during map panning/scrolling.
       RunLoop.main.add(dismissTimer!, forMode: .common)
     }

@@ -77,7 +77,10 @@
       manager.distanceFilter = 500  // Emit updates every ~500 m
 
       // Forward delegate callbacks into this service via the delegate bridge.
-      delegate.onLocationUpdate = { coord in
+      // Updates `lastKnownLocation` on every fix so that `currentLocation()`
+      // always returns the most recent position.
+      delegate.onLocationUpdate = { [weak self] coord in
+        self?.lastKnownLocation = coord
         continuation.yield(coord)
       }
     }
@@ -148,14 +151,15 @@
 
   // MARK: - LocationDelegate
 
-  /// A non-isolated `CLLocationManagerDelegate` bridge that forwards callbacks
-  /// into Swift Concurrency contexts without violating actor isolation.
+  /// `@MainActor`-isolated `CLLocationManagerDelegate` bridge that forwards
+  /// callbacks into Swift Concurrency contexts.
   ///
-  /// `LocationDelegate` is a reference type intentionally left without actor
-  /// isolation so the `CLLocationManager` (which calls delegates on the main
-  /// thread) can invoke it freely. All forwarded callbacks target `@MainActor`
-  /// closures set by `CoreLocationService`.
-  private final class LocationDelegate: NSObject, CLLocationManagerDelegate, @unchecked Sendable {
+  /// `CLLocationManager` always calls its delegate on the main thread, so
+  /// `@MainActor` is the correct, compiler-verified isolation guarantee.
+  /// This replaces the previous `@unchecked Sendable` annotation which
+  /// relied on an implicit (and fragile) threading contract.
+  @MainActor
+  private final class LocationDelegate: NSObject, CLLocationManagerDelegate {
 
     var onLocationUpdate: ((GeoCoordinate) -> Void)?
     var oneShotContinuation: CheckedContinuation<GeoCoordinate, Error>?
@@ -170,15 +174,16 @@
       guard let geoCoord = GeoCoordinate(latitude: coord.latitude, longitude: coord.longitude)
       else { return }
 
+      // Always notify the service of the latest fix so that
+      // `lastKnownLocation` stays current regardless of one-shot
+      // or continuous tracking mode.
+      onLocationUpdate?(geoCoord)
+
       // Satisfy one-shot request if pending.
       if let continuation = oneShotContinuation {
         oneShotContinuation = nil
         continuation.resume(returning: geoCoord)
-        return
       }
-
-      // Feed continuous stream.
-      onLocationUpdate?(geoCoord)
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
