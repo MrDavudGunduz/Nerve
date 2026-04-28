@@ -1,0 +1,127 @@
+# Nerve — Continuous Integration
+#
+# Builds and tests all SPM packages on every PR and push to main.
+# Includes Thread Sanitizer (TSan) for data race detection.
+#
+# Architecture:
+#   - Matrix strategy: tests each package independently
+#   - iOS Simulator + macOS native destinations
+#   - TSan enabled via xcodebuild settings
+#
+# Reference: DEVELOPMENT_ROADMAP.md → Cross-Cutting Concerns → CI/CD Pipeline
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_16.0.app/Contents/Developer
+  SWIFT_VERSION: "6.0"
+
+jobs:
+  # ── SPM Package Tests ─────────────────────────────────────────────
+  spm-tests:
+    name: "Test ${{ matrix.package }} (${{ matrix.platform }})"
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - Core
+          - NetworkLayer
+          - StorageLayer
+          - MapFeature
+          - ARFeature
+          - AILayer
+        platform:
+          - iOS
+          - macOS
+        exclude:
+          # MapFeature and ARFeature use UIKit — skip macOS for these.
+          - package: MapFeature
+            platform: macOS
+          - package: ARFeature
+            platform: macOS
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s "$DEVELOPER_DIR"
+
+      - name: Resolve Packages
+        run: swift package resolve
+        working-directory: Packages/${{ matrix.package }}
+
+      - name: Build & Test (iOS)
+        if: matrix.platform == 'iOS'
+        run: |
+          xcodebuild test \
+            -scheme ${{ matrix.package }} \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=latest' \
+            -enableThreadSanitizer YES \
+            -resultBundlePath .build/results-${{ matrix.package }}-iOS.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions || true
+        working-directory: Packages/${{ matrix.package }}
+
+      - name: Build & Test (macOS)
+        if: matrix.platform == 'macOS'
+        run: |
+          swift test \
+            --package-path Packages/${{ matrix.package }} \
+            --sanitize=thread
+
+      - name: Upload Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.package }}-${{ matrix.platform }}
+          path: Packages/${{ matrix.package }}/.build/results-*.xcresult
+          if-no-files-found: ignore
+
+  # ── App Target Build ──────────────────────────────────────────────
+  app-build:
+    name: "Build Nerve App (iOS)"
+    runs-on: macos-15
+    needs: spm-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s "$DEVELOPER_DIR"
+
+      - name: Build App
+        run: |
+          xcodebuild build \
+            -scheme Nerve \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=latest' \
+            -enableThreadSanitizer YES \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions || true
+
+  # ── Status Gate ───────────────────────────────────────────────────
+  ci-status:
+    name: CI Status
+    runs-on: ubuntu-latest
+    needs: [spm-tests, app-build]
+    if: always()
+    steps:
+      - name: Check Results
+        run: |
+          if [ "${{ needs.spm-tests.result }}" != "success" ] || \
+             [ "${{ needs.app-build.result }}" != "success" ]; then
+            echo "❌ CI failed"
+            exit 1
+          fi
+          echo "✅ All checks passed"

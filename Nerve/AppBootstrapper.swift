@@ -82,9 +82,17 @@ enum AppBootstrapper {
 
     // MARK: - Location (CoreLocation)
 
-    // Production: @MainActor-isolated CLLocationManager bridge.
+    // Production: platform-aware factory vends CoreLocationService on iOS/visionOS,
+    // NullLocationService on macOS. Concrete type stays encapsulated in MapFeature.
     await container.register(LocationServiceProtocol.self, lifetime: .singleton) {
-      await CoreLocationService()
+      await LocationServiceFactory.makeService()
+    }
+
+    // MARK: - Image Loading (Stub)
+
+    // TODO: Replace with URLSessionImageService once image caching is implemented.
+    await container.register(ImageServiceProtocol.self, lifetime: .singleton) {
+      StubImageService()
     }
 
     let count = await container.registrationCount
@@ -114,5 +122,21 @@ private struct StubNewsService: NewsServiceProtocol {
       message:
         "StubNewsService does not support fetchNewsDetail(id:). Implement NetworkNewsService."
     )
+  }
+}
+
+// MARK: StubImageService
+
+private struct StubImageService: ImageServiceProtocol {
+
+  func loadImage(from url: URL) async throws -> Data {
+    Logger(subsystem: "Nerve", category: "Stub").warning(
+      "StubImageService.loadImage called — returning empty data. Implement URLSessionImageService."
+    )
+    return Data()
+  }
+
+  func clearCache() async {
+    // No-op for stub.
   }
 }

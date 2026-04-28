@@ -426,38 +426,43 @@
         // Debounce: cancel any pending work and restart the 300 ms timer.
         // This collapses rapid pan/zoom events into a single load or recluster
         // call, preventing per-frame network and clustering work.
+        // Reverse geocoding is also coalesced here to respect Apple's ~50 req/min
+        // rate limit on CLGeocoder.
         debounceTask?.cancel()
-        debounceTask = Task { @MainActor [weak self] in
+        debounceTask = Task { @MainActor [weak self, weak mapView] in
           do {
             try await Task.sleep(for: Self.debounceDelay)
           } catch {
             return  // Cancelled — a newer region change supersedes this one.
           }
-          guard let self else { return }
+          guard let self, let mapView else { return }
           if isSignificantChange {
             self.lastLoadedRadiusMeters = geoRegion.radiusMeters
             await self.viewModel.loadNews(for: geoRegion, zoomLevel: zoomLevel)
           } else {
             await self.viewModel.recluster(in: geoRegion, zoomLevel: zoomLevel)
           }
-        }
 
-        // ── Reverse Geocoding (city label) ──
-        guard !isGeocoding else { return }
-        isGeocoding = true
-        let clLocation = CLLocation(
-          latitude: visibleRegion.center.latitude,
-          longitude: visibleRegion.center.longitude
-        )
-        geocoder.reverseGeocodeLocation(clLocation) { [weak self, weak mapView] placemarks, _ in
-          guard let self, let mapView else { return }
-          self.isGeocoding = false
-          let place = placemarks?.first
-          let cityText = place?.locality ?? place?.administrativeArea ?? ""
-          Task { @MainActor [weak mapView] in
-            guard let mapView else { return }
-            if let cityLabel = mapView.viewWithTag(ViewTag.cityLabel) as? UILabel {
-              cityLabel.text = cityText.isEmpty ? nil : "  \(cityText)  "
+          // ── Reverse Geocoding (city label) ──
+          // Runs after debounce settles — prevents CLGeocoder rate-limit errors
+          // during aggressive pan gestures.
+          guard !self.isGeocoding else { return }
+          self.isGeocoding = true
+          let clLocation = CLLocation(
+            latitude: visibleRegion.center.latitude,
+            longitude: visibleRegion.center.longitude
+          )
+          self.geocoder.reverseGeocodeLocation(clLocation) { [weak self, weak mapView] placemarks, _
+          in
+            guard let self, let mapView else { return }
+            self.isGeocoding = false
+            let place = placemarks?.first
+            let cityText = place?.locality ?? place?.administrativeArea ?? ""
+            Task { @MainActor [weak mapView] in
+              guard let mapView else { return }
+              if let cityLabel = mapView.viewWithTag(ViewTag.cityLabel) as? UILabel {
+                cityLabel.text = cityText.isEmpty ? nil : "  \(cityText)  "
+              }
             }
           }
         }

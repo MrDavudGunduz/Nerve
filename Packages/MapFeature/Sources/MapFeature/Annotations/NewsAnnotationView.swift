@@ -119,6 +119,13 @@
       } else {
         layer.borderColor = UIColor.white.withAlphaComponent(0.35).cgColor
       }
+
+      // ── Accessibility ──
+      isAccessibilityElement = true
+      accessibilityTraits = .button
+      let credibility = item.analysis?.credibilityLabel.rawValue ?? "unanalyzed"
+      accessibilityLabel = "\(item.category.rawValue.capitalized) news: \(item.headline). Credibility: \(credibility)"
+      accessibilityHint = "Double tap to view details"
     }
 
     // MARK: - Skeleton

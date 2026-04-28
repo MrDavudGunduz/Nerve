@@ -7,6 +7,7 @@
 
 import Core
 import Foundation
+import OSLog
 import SwiftData
 
 // MARK: - PersistenceActor
@@ -35,6 +36,9 @@ public actor PersistenceActor {
   // MARK: - Properties
 
   private let modelContext: ModelContext
+
+  /// Logger for persistence diagnostics including corrupt record detection.
+  private let logger = Logger(subsystem: "com.davudgunduz.Nerve", category: "Persistence")
 
   /// The time-to-live for cached news items (24 hours).
   private static let cacheTTL: TimeInterval = 86_400
@@ -144,7 +148,21 @@ public actor PersistenceActor {
     if let offset, offset > 0 { descriptor.fetchOffset = offset }
 
     let models = try modelContext.fetch(descriptor)
-    return models.compactMap { try? $0.toDomainModel() }
+    return models.compactMap { model in
+      do {
+        return try model.toDomainModel()
+      } catch {
+        logger.warning(
+          """
+          Corrupt persistence record skipped — id: \(model.id, privacy: .public), \
+          error: \(error.localizedDescription, privacy: .public). \
+          Record remains in store; consider manual cleanup.
+          """
+        )
+        return nil
+      }
+    }
+
   }
 
   // MARK: - Delete

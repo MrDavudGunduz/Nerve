@@ -76,16 +76,20 @@
 
     private let headlineLabel: UILabel = {
       let label = UILabel()
-      label.font = .systemFont(ofSize: 18, weight: .bold)
+      label.font = .preferredFont(forTextStyle: .headline)
+      label.adjustsFontForContentSizeCategory = true
       label.numberOfLines = 3
       label.textColor = .label
+      label.accessibilityIdentifier = "newsDetailHeadline"
       return label
     }()
 
     private let metaLabel: UILabel = {
       let label = UILabel()
-      label.font = .systemFont(ofSize: 13, weight: .regular)
+      label.font = .preferredFont(forTextStyle: .caption1)
+      label.adjustsFontForContentSizeCategory = true
       label.textColor = .secondaryLabel
+      label.accessibilityIdentifier = "newsDetailMeta"
       return label
     }()
 
@@ -98,9 +102,11 @@
 
     private let credibilityLabel: UILabel = {
       let label = UILabel()
-      label.font = .systemFont(ofSize: 12, weight: .semibold)
+      label.font = .preferredFont(forTextStyle: .caption2)
+      label.adjustsFontForContentSizeCategory = true
       label.textColor = .white
       label.textAlignment = .center
+      label.accessibilityIdentifier = "newsDetailCredibility"
       return label
     }()
 
@@ -126,7 +132,10 @@
       config.baseBackgroundColor = .systemBlue
       config.baseForegroundColor = .white
       config.cornerStyle = .large
-      return UIButton(configuration: config)
+      let btn = UIButton(configuration: config)
+      btn.accessibilityIdentifier = "newsDetailOpenButton"
+      btn.accessibilityHint = "Opens the full article in browser"
+      return btn
     }()
 
     // MARK: - Init

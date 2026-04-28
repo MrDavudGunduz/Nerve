@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- ── Accessed API Types ────────────────────────────────────── -->
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<!-- UserDefaults (used by SwiftData internally) -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+		<!-- File timestamp APIs (SwiftData / cache TTL) -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+	</array>
+
+	<!-- ── Tracking Declaration ──────────────────────────────────── -->
+	<key>NSPrivacyTracking</key>
+	<false/>
+
+	<!-- ── Tracking Domains ──────────────────────────────────────── -->
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+
+	<!-- ── Collected Data Types ───────────────────────────────────── -->
+	<!-- Nerve does not collect or transmit any user data. -->
+	<!-- All AI inference runs on-device; location data stays local. -->
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+</dict>
+</plist>

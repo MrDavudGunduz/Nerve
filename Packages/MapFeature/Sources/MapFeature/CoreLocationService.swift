@@ -154,12 +154,14 @@
   /// `@MainActor`-isolated `CLLocationManagerDelegate` bridge that forwards
   /// callbacks into Swift Concurrency contexts.
   ///
-  /// `CLLocationManager` always calls its delegate on the main thread, so
-  /// `@MainActor` is the correct, compiler-verified isolation guarantee.
-  /// This replaces the previous `@unchecked Sendable` annotation which
-  /// relied on an implicit (and fragile) threading contract.
+  /// `CLLocationManager` guarantees that delegate callbacks are delivered on
+  /// the main thread. `@MainActor` is therefore the correct, compiler-verified
+  /// isolation for all mutable state. The `@preconcurrency` annotation on
+  /// `CLLocationManagerDelegate` tells the compiler that the Objective-C
+  /// protocol's requirements are safely satisfied under our actor isolation,
+  /// avoiding the "crosses into main actor-isolated code" diagnostic.
   @MainActor
-  private final class LocationDelegate: NSObject, CLLocationManagerDelegate {
+  private final class LocationDelegate: NSObject, @preconcurrency CLLocationManagerDelegate {
 
     var onLocationUpdate: ((GeoCoordinate) -> Void)?
     var oneShotContinuation: CheckedContinuation<GeoCoordinate, Error>?

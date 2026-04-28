@@ -27,7 +27,13 @@
     static let cityLabel = 9_004
   }
 
-  // MARK: - MKCoordinateRegion + ZoomLevel
+#endif
+
+// MARK: - MKCoordinateRegion + ZoomLevel
+
+#if canImport(MapKit)
+
+  import MapKit
 
   extension MKCoordinateRegion {
 

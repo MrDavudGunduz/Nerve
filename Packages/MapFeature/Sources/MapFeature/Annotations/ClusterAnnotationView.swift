@@ -124,6 +124,13 @@
         // No analysis yet — neutral ring.
         layer.borderColor = UIColor.white.withAlphaComponent(0.35).cgColor
       }
+
+      // ── Accessibility ──
+      isAccessibilityElement = true
+      accessibilityTraits = .button
+      let credibility = cluster.averageCredibilityLabel?.rawValue ?? "unanalyzed"
+      accessibilityLabel = "News cluster: \(cluster.count) stories, \(cluster.dominantCategory.rawValue.capitalized) category. Credibility: \(credibility)"
+      accessibilityHint = "Double tap to view cluster details"
     }
 
     // MARK: - Skeleton

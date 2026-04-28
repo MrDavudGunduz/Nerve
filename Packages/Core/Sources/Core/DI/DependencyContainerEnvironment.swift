@@ -16,6 +16,15 @@ import SwiftUI
 /// Defined in `Core` so that every feature package (e.g. `MapFeature`) can
 /// read the container without depending on the app target.
 ///
+/// ## SwiftUI Import Justification
+///
+/// This file is the **only** file in `Core` that imports SwiftUI, and it uses
+/// **exclusively** `EnvironmentKey` and `EnvironmentValues` — no views, no
+/// `@State`, no rendering types. This minimal surface allows all feature
+/// packages to read the DI container via `@Environment` without a separate
+/// bridge module. If `Core` ever needs a broader "no SwiftUI" policy, move
+/// this file to a `CoreUI` micro-package.
+///
 /// ## Injecting the Container
 ///
 /// In `NerveApp.swift`:

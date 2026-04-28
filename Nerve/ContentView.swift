@@ -65,18 +65,48 @@ struct ContentView: View {
   // MARK: - Sidebar Layout (macOS)
 
   #if os(macOS)
+    @State private var selectedTab: Tab = .map
+
     private var sidebarView: some View {
       NavigationSplitView {
-        List {
+        List(selection: $selectedTab) {
           Label("Map", systemImage: "map.fill")
+            .tag(Tab.map)
           Label("Headlines", systemImage: "newspaper.fill")
+            .tag(Tab.headlines)
           Label("Insights", systemImage: "chart.bar.xaxis")
+            .tag(Tab.insights)
           Label("Settings", systemImage: "gearshape.fill")
+            .tag(Tab.settings)
         }
         .navigationTitle("Nerve")
       } detail: {
-        Text("Map View")
-          .foregroundStyle(.secondary)
+        switch selectedTab {
+        case .map:
+          NerveMapView()
+        case .headlines, .insights, .settings:
+          VStack(spacing: 16) {
+            Image(systemName: tabIcon(for: selectedTab))
+              .font(.system(size: 48))
+              .foregroundStyle(.tertiary)
+            Text(selectedTab.title)
+              .font(.title2)
+              .foregroundStyle(.secondary)
+            Text("Coming soon")
+              .font(.subheadline)
+              .foregroundStyle(.tertiary)
+          }
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+      }
+    }
+
+    private func tabIcon(for tab: Tab) -> String {
+      switch tab {
+      case .map: "map.fill"
+      case .headlines: "newspaper.fill"
+      case .insights: "chart.bar.xaxis"
+      case .settings: "gearshape.fill"
       }
     }
   #endif
@@ -111,6 +141,15 @@ struct ContentView: View {
 
 private enum Tab: Hashable {
   case map, headlines, insights, settings
+
+  var title: String {
+    switch self {
+    case .map: "Map"
+    case .headlines: "Headlines"
+    case .insights: "Insights"
+    case .settings: "Settings"
+    }
+  }
 }
 
 // MARK: - Preview

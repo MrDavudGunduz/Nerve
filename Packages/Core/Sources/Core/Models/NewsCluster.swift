@@ -125,9 +125,12 @@ public struct NewsCluster: Sendable, Identifiable, Hashable {
     //   • If a cluster ID ever reaches NavigationPath, state restoration,
     //     or a persistence layer, a Hasher-based ID would silently break it.
     //   • CryptoKit.SHA256 is a system framework — no extra SPM dependency.
+    //
+    // Truncated to 16 hex characters (64 bits) — sufficient uniqueness for
+    // clustering scenarios while reducing memory footprint vs. full 64-char digest.
     let sortedIDs = items.map(\.id).sorted().joined(separator: ",")
     let digest = SHA256.hash(data: Data(sortedIDs.utf8))
-    self.id = digest.compactMap { String(format: "%02x", $0) }.joined()
+    self.id = digest.prefix(8).compactMap { String(format: "%02x", $0) }.joined()
 
     self.center = centroid
     self.items = items
