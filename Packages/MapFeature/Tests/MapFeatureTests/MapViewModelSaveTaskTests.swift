@@ -123,13 +123,13 @@ struct MapViewModelSaveTaskTests {
       "Background save must be cancelled when reset() is called before it completes")
   }
 
-  // MARK: - Seed Data Save
+  // MARK: - Seed Data (In-Memory Only)
 
-  /// Verifies that when seed data is injected (empty cache + empty network),
-  /// the seed items are persisted so they are available on the fast path
-  /// next time the user opens the map.
-  @Test("Seed data is saved to storage when injected")
-  func seedDataIsPersisted() async throws {
+  /// Verifies that seed data injected in DEBUG builds is NOT persisted to
+  /// SwiftData. Seed data is meant to stay in-memory only to prevent stale
+  /// demo data from contaminating production stores across build configurations.
+  @Test("Seed data is NOT persisted to storage (in-memory only)")
+  func seedDataIsNotPersisted() async throws {
     let storageService = SpyStorageService()
     let vm = MapViewModel(
       clusterer: AnnotationClusterer(),
@@ -142,10 +142,7 @@ struct MapViewModelSaveTaskTests {
     try await Task.sleep(for: .milliseconds(100))
 
     let callCount = await storageService.saveCallCount
-    #expect(callCount >= 1, "Seed data must be persisted after injection")
-
-    let savedCount = await storageService.lastSavedItems.count
-    #expect(savedCount > 0, "At least one seed item must have been saved")
+    #expect(callCount == 0, "Seed data must NOT be persisted — it should stay in-memory only")
   }
 }
 
