@@ -6,8 +6,10 @@
 //
 
 import AILayer
+import ARFeature
 import Core
 import MapFeature
+import NetworkLayer
 import OSLog
 import StorageLayer
 import SwiftData
@@ -22,9 +24,11 @@ import SwiftData
 /// ## Lifecycle
 ///
 /// Concrete implementations (network clients, SwiftData actors, CoreML models)
-/// replace the stub registrations below as each module matures. Stubs are used
-/// in the interim to keep the app functional and the DI container populated so
-/// that `resolve()` never throws `notRegistered` at runtime.
+/// replace the placeholder registrations below as each module matures.
+/// Placeholder services live in their respective module packages (e.g.,
+/// ``NetworkLayer/PlaceholderNewsService``) to keep the app functional
+/// and the DI container populated so that `resolve()` never throws
+/// `notRegistered` at runtime.
 ///
 /// ## Adding a New Service
 ///
@@ -58,11 +62,11 @@ enum AppBootstrapper {
       AnnotationClusterer()
     }
 
-    // MARK: - News (Stub)
+    // MARK: - News (Placeholder)
 
-    // TODO: Replace with NetworkNewsService once NetworkLayer is implemented.
+    // TODO: Replace with NetworkNewsService once the REST API is integrated.
     await container.register(NewsServiceProtocol.self, lifetime: .singleton) {
-      StubNewsService()
+      PlaceholderNewsService()
     }
 
     // MARK: - Storage (SwiftData)
@@ -80,6 +84,13 @@ enum AppBootstrapper {
       HeadlineAnalyzer()
     }
 
+    // MARK: - AR / Spatial Computing
+
+    // Production: actor-isolated AR capability detection and USDZ asset management.
+    await container.register(ARServiceProtocol.self, lifetime: .singleton) {
+      ARService()
+    }
+
     // MARK: - Location (CoreLocation)
 
     // Production: platform-aware factory vends CoreLocationService on iOS/visionOS,
@@ -88,11 +99,11 @@ enum AppBootstrapper {
       await LocationServiceFactory.makeService()
     }
 
-    // MARK: - Image Loading (Stub)
+    // MARK: - Image Loading (Placeholder)
 
     // TODO: Replace with URLSessionImageService once image caching is implemented.
     await container.register(ImageServiceProtocol.self, lifetime: .singleton) {
-      StubImageService()
+      PlaceholderImageService()
     }
 
     let count = await container.registrationCount
@@ -100,43 +111,3 @@ enum AppBootstrapper {
   }
 }
 
-// MARK: - Stub Implementations
-
-// These stubs satisfy protocol contracts and keep the app runnable while
-// concrete implementations are being developed. Each stub logs a warning
-// so developers are aware when a real service is needed.
-
-// MARK: StubNewsService
-
-private struct StubNewsService: NewsServiceProtocol {
-
-  func fetchNews(for region: GeoRegion) async throws -> [NewsItem] {
-    Logger(subsystem: "Nerve", category: "Stub").warning(
-      "StubNewsService.fetchNews called — no data returned. Implement NetworkNewsService."
-    )
-    return []
-  }
-
-  func fetchNewsDetail(id: String) async throws -> NewsItem {
-    throw NerveError.network(
-      message:
-        "StubNewsService does not support fetchNewsDetail(id:). Implement NetworkNewsService."
-    )
-  }
-}
-
-// MARK: StubImageService
-
-private struct StubImageService: ImageServiceProtocol {
-
-  func loadImage(from url: URL) async throws -> Data {
-    Logger(subsystem: "Nerve", category: "Stub").warning(
-      "StubImageService.loadImage called — returning empty data. Implement URLSessionImageService."
-    )
-    return Data()
-  }
-
-  func clearCache() async {
-    // No-op for stub.
-  }
-}

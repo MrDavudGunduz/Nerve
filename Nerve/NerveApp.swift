@@ -11,10 +11,20 @@ import StorageLayer
 import SwiftData
 import SwiftUI
 
+#if canImport(ARFeature)
+  import ARFeature
+#endif
+
 /// The main entry point for the Nerve application.
 ///
 /// Nerve is a multiplatform app (iOS · macOS · visionOS) that provides
 /// spatial news intelligence with on-device AI analysis.
+///
+/// ## Scene Architecture
+///
+/// - **2D Window** (all platforms): ``ContentView`` with tab/sidebar navigation.
+/// - **Volumetric Window** (visionOS): ``VolumetricNewsView`` for 3D news models.
+/// - **Immersive Space** (visionOS): ``SpatialMapView`` for the spatial news map.
 @main
 struct NerveApp: App {
 
@@ -89,6 +99,7 @@ struct NerveApp: App {
   // MARK: - Scene
 
   var body: some Scene {
+    // Primary 2D window — all platforms.
     WindowGroup {
       ContentView()
         .environment(\.dependencyContainer, container)
@@ -100,5 +111,26 @@ struct NerveApp: App {
         }
     }
     .modelContainer(sharedModelContainer)
+
+    // visionOS: Volumetric 3D news viewer.
+    #if os(visionOS)
+      WindowGroup(id: "news-3d-viewer") {
+        VolumetricNewsView()
+          .environment(\.dependencyContainer, container)
+      }
+      .windowStyle(.volumetric)
+      .defaultSize(
+        width: 0.5,
+        height: 0.5,
+        depth: 0.5,
+        in: .meters
+      )
+
+      // visionOS: Immersive spatial map experience.
+      ImmersiveSpace(id: "spatial-map") {
+        SpatialMapView()
+      }
+      .immersionStyle(selection: .constant(.mixed), in: .mixed)
+    #endif
   }
 }
