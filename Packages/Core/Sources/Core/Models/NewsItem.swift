@@ -114,6 +114,40 @@ public struct NewsItem: Sendable, Codable, Identifiable {
     self.analysis = analysis
   }
 
+  // MARK: - AR Support
+
+  /// Whether this news item is eligible for AR/3D model display.
+  ///
+  /// Currently limited to `.technology` and `.science` categories,
+  /// which have associated USDZ demonstration models.
+  /// Expand this predicate as more 3D assets become available.
+  public var isARCapable: Bool {
+    switch category {
+    case .technology, .science:
+      return true
+    case .politics, .health, .sports, .entertainment, .business,
+      .environment, .other:
+      return false
+    }
+  }
+
+  /// The USDZ model name associated with this item's category.
+  ///
+  /// Returns `nil` if ``isARCapable`` is `false`.
+  /// The name corresponds to a bundled `.usdz` file (without extension)
+  /// or a key in the remote asset catalog.
+  public var arModelName: String? {
+    switch category {
+    case .technology:
+      return "tech_device"
+    case .science:
+      return "science_model"
+    case .politics, .health, .sports, .entertainment, .business,
+      .environment, .other:
+      return nil
+    }
+  }
+
   // MARK: - Convenience
 
   /// Returns a copy of this item with the given analysis attached.
