@@ -63,20 +63,22 @@ extension EnvironmentValues {
   /// The app-wide dependency container available to all SwiftUI views.
   ///
   /// - Important: Inject via `.environment(\.dependencyContainer, container)` at the
-  ///   root of the view hierarchy. In `DEBUG` builds, accessing this without prior
-  ///   injection logs a warning to help catch configuration mistakes early.
+  ///   root of the view hierarchy. Accessing this property without prior injection
+  ///   logs a warning. SwiftUI may read `EnvironmentValues` during view init
+  ///   *before* the `.environment()` modifier runs — this is expected lifecycle
+  ///   behavior, not a configuration error, so we log instead of crashing.
   public var dependencyContainer: DependencyContainer {
     get {
-      #if DEBUG
-        if !self[DependencyContainerInjectedKey.self] {
-          environmentLogger.warning(
-            """
-            DependencyContainer accessed but never injected. \
-            Add .environment(\\.dependencyContainer, container) to the root view hierarchy.
-            """
-          )
-        }
-      #endif
+      if !self[DependencyContainerInjectedKey.self] {
+        environmentLogger.warning(
+          """
+          DependencyContainer accessed but not yet injected. \
+          If this appears after app startup completes, ensure \
+          .environment(\\.dependencyContainer, container) is set on the root view hierarchy. \
+          Services resolved from this container will fail with 'notRegistered' errors.
+          """
+        )
+      }
       return self[DependencyContainerKey.self]
     }
     set {
