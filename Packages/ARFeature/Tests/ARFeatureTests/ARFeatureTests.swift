@@ -78,8 +78,12 @@ struct ARFeatureDITests {
 /// implemented from an AR-context consumer.
 actor StubLocationService: LocationServiceProtocol {
 
-  var currentLocation: GeoCoordinate? {
-    GeoCoordinate(latitude: 41.0082, longitude: 28.9784)
+  private let _storedLocation: GeoCoordinate? = GeoCoordinate(
+    latitude: 41.0082, longitude: 28.9784
+  )
+
+  func currentLocation() async throws -> GeoCoordinate? {
+    _storedLocation
   }
 
   func startTracking() async throws {}
@@ -87,7 +91,7 @@ actor StubLocationService: LocationServiceProtocol {
   func stopTracking() async {}
 
   func requestCurrentLocation() async throws -> GeoCoordinate {
-    guard let location = currentLocation else {
+    guard let location = _storedLocation else {
       throw NerveError.location(message: "Stub: no location available")
     }
     return location

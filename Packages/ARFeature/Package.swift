@@ -19,6 +19,8 @@ let package = Package(
     .target(
       name: "ARFeature",
       dependencies: ["Core"]
+      // When USDZ model files are added, uncomment the resources block:
+      // resources: [.process("Resources")]
     ),
     .testTarget(
       name: "ARFeatureTests",
