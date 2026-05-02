@@ -77,7 +77,31 @@ extension MapViewModel {
         }
 
         // ── NETWORK PATH (runs concurrently with cache display) ──
-        let fetched = try await newsService.fetchNews(for: region)
+        // Retry transient failures (timeouts, server errors) with backoff.
+        let fetched = try await RetryPolicy.execute(
+          maxAttempts: 3,
+          baseDelay: 1.0,
+          shouldRetry: { error in
+            // Don't retry non-transient errors (auth, not found, etc.)
+            if let nerveError = error as? NerveError {
+              switch nerveError {
+              case .network(let msg, _):
+                return msg.contains("429") || msg.contains("Server error")
+                  || msg.contains("timed out")
+              default:
+                return false
+              }
+            }
+            if let urlError = error as? URLError {
+              return urlError.code == .timedOut
+                || urlError.code == .networkConnectionLost
+                || urlError.code == .notConnectedToInternet
+            }
+            return false
+          }
+        ) {
+          try await newsService.fetchNews(for: region)
+        }
         guard !Task.isCancelled else { return }
 
         if !fetched.isEmpty {

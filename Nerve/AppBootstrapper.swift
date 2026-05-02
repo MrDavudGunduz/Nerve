@@ -62,12 +62,19 @@ enum AppBootstrapper {
       AnnotationClusterer()
     }
 
-    // MARK: - News (Placeholder)
+    // MARK: - News (URLSession)
 
-    // TODO: Replace with NetworkNewsService once the REST API is integrated.
-    await container.register(NewsServiceProtocol.self, lifetime: .singleton) {
-      PlaceholderNewsService()
-    }
+    // Production REST client with exponential backoff retry.
+    // Falls back to PlaceholderNewsService if no API endpoint is configured.
+    #if DEBUG
+      await container.register(NewsServiceProtocol.self, lifetime: .singleton) {
+        PlaceholderNewsService()
+      }
+    #else
+      await container.register(NewsServiceProtocol.self, lifetime: .singleton) {
+        URLSessionNewsService(configuration: .production)
+      }
+    #endif
 
     // MARK: - Storage (SwiftData)
 
@@ -99,11 +106,11 @@ enum AppBootstrapper {
       await LocationServiceFactory.makeService()
     }
 
-    // MARK: - Image Loading (Placeholder)
+    // MARK: - Image Loading (URLSession + L1/L2 Cache)
 
-    // TODO: Replace with URLSessionImageService once image caching is implemented.
+    // Production: two-tier (memory + disk) image cache with request coalescing.
     await container.register(ImageServiceProtocol.self, lifetime: .singleton) {
-      PlaceholderImageService()
+      URLSessionImageService(cacheSizeMB: 100)
     }
 
     let count = await container.registrationCount

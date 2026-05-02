@@ -56,6 +56,15 @@ private let environmentLogger = Logger(
   category: "Environment"
 )
 
+/// Process-level flag set after the first successful injection.
+///
+/// During normal SwiftUI startup, `EnvironmentValues` getters are
+/// called *before* `.environment()` modifiers run. Logging a warning
+/// at that stage produces false-positive noise. This flag suppresses
+/// the warning until at least one injection has occurred — after which
+/// an uninjected access is genuinely unexpected.
+private nonisolated(unsafe) var hasEverBeenInjected = false
+
 // MARK: - EnvironmentValues Extension
 
 extension EnvironmentValues {
@@ -69,12 +78,15 @@ extension EnvironmentValues {
   ///   behavior, not a configuration error, so we log instead of crashing.
   public var dependencyContainer: DependencyContainer {
     get {
-      if !self[DependencyContainerInjectedKey.self] {
+      // Only warn after at least one injection has occurred in this process.
+      // Before that, SwiftUI is still assembling the view hierarchy —
+      // reading the default value is expected lifecycle behavior.
+      if hasEverBeenInjected && !self[DependencyContainerInjectedKey.self] {
         environmentLogger.warning(
           """
           DependencyContainer accessed but not yet injected. \
-          If this appears after app startup completes, ensure \
-          .environment(\\.dependencyContainer, container) is set on the root view hierarchy. \
+          Ensure .environment(\\.dependencyContainer, container) \
+          is set on the root view hierarchy. \
           Services resolved from this container will fail with 'notRegistered' errors.
           """
         )
@@ -84,6 +96,7 @@ extension EnvironmentValues {
     set {
       self[DependencyContainerKey.self] = newValue
       self[DependencyContainerInjectedKey.self] = true
+      hasEverBeenInjected = true
     }
   }
 }
