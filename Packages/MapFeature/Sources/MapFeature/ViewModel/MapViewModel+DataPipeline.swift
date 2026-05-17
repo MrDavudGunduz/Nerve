@@ -77,31 +77,11 @@ extension MapViewModel {
         }
 
         // ── NETWORK PATH (runs concurrently with cache display) ──
-        // Retry transient failures (timeouts, server errors) with backoff.
-        let fetched = try await RetryPolicy.execute(
-          maxAttempts: 3,
-          baseDelay: 1.0,
-          shouldRetry: { error in
-            // Don't retry non-transient errors (auth, not found, etc.)
-            if let nerveError = error as? NerveError {
-              switch nerveError {
-              case .network(let msg, _):
-                return msg.contains("429") || msg.contains("Server error")
-                  || msg.contains("timed out")
-              default:
-                return false
-              }
-            }
-            if let urlError = error as? URLError {
-              return urlError.code == .timedOut
-                || urlError.code == .networkConnectionLost
-                || urlError.code == .notConnectedToInternet
-            }
-            return false
-          }
-        ) {
-          try await newsService.fetchNews(for: region)
-        }
+        // No retry wrapper here — URLSessionNewsService already applies
+        // RetryPolicy internally with exponential backoff. Adding a second
+        // layer would compound attempts (3×3 = 9 total), wasting bandwidth
+        // and delaying error surfacing on non-retryable failures.
+        let fetched = try await newsService.fetchNews(for: region)
         guard !Task.isCancelled else { return }
 
         if !fetched.isEmpty {

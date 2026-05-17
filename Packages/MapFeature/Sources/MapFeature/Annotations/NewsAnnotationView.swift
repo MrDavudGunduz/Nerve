@@ -131,10 +131,19 @@
     // MARK: - Skeleton
 
     /// Replaces real content with a pulsing grey placeholder while data loads.
+    ///
+    /// Respects the user's Reduce Motion accessibility preference.
+    /// When Reduce Motion is enabled, the skeleton is shown with a static
+    /// reduced opacity instead of a pulsing animation.
     public func showSkeleton() {
       iconView.image = nil
       backgroundColor = .systemGray4
       layer.borderColor = UIColor.clear.cgColor
+
+      guard !UIAccessibility.isReduceMotionEnabled else {
+        layer.opacity = 0.6
+        return
+      }
 
       let pulse = CABasicAnimation(keyPath: "opacity")
       pulse.fromValue = 1.0
@@ -149,18 +158,30 @@
     /// Restores the normal appearance after data has loaded.
     public func hideSkeleton() {
       layer.removeAnimation(forKey: "skeletonPulse")
+      layer.opacity = 1.0
     }
 
     // MARK: - Selection Animation
 
+    /// Animates the selection state with a spring scale effect.
+    ///
+    /// Respects the user's Reduce Motion accessibility preference.
+    /// When Reduce Motion is enabled, the transform is applied instantly
+    /// without spring animation.
     override public func setSelected(_ selected: Bool, animated: Bool) {
       super.setSelected(selected, animated: animated)
 
-      guard animated else {
-        transform =
-          selected
-          ? CGAffineTransform(scaleX: 1.2, y: 1.2)
-          : .identity
+      let targetTransform: CGAffineTransform =
+        selected
+        ? CGAffineTransform(scaleX: 1.2, y: 1.2)
+        : .identity
+      let targetShadowOpacity: Float = selected ? 0.35 : 0.15
+      let targetShadowRadius: CGFloat = selected ? 6 : 3
+
+      guard animated, !UIAccessibility.isReduceMotionEnabled else {
+        transform = targetTransform
+        layer.shadowOpacity = targetShadowOpacity
+        layer.shadowRadius = targetShadowRadius
         return
       }
 
@@ -169,12 +190,9 @@
         usingSpringWithDamping: 0.65, initialSpringVelocity: 0.8,
         options: [.curveEaseInOut],
         animations: {
-          self.transform =
-            selected
-            ? CGAffineTransform(scaleX: 1.2, y: 1.2)
-            : .identity
-          self.layer.shadowOpacity = selected ? 0.35 : 0.15
-          self.layer.shadowRadius = selected ? 6 : 3
+          self.transform = targetTransform
+          self.layer.shadowOpacity = targetShadowOpacity
+          self.layer.shadowRadius = targetShadowRadius
         }
       )
     }

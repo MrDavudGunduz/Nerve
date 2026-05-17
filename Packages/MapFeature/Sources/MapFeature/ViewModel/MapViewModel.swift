@@ -150,4 +150,24 @@ public final class MapViewModel {
     self.locationService = StubLocationServiceInternal()
     self.aiService = nil
   }
+
+  // MARK: - Lifecycle
+
+  /// Cancels all in-flight background tasks on deallocation.
+  ///
+  /// Without this, orphaned `Task` handles would run to completion (or until
+  /// the next `Task.isCancelled` check), performing unnecessary I/O against
+  /// storage, network, or AI services after the ViewModel's lifecycle ends.
+  ///
+  /// - Note: `deinit` on `@MainActor` classes is guaranteed to run on the
+  ///   main thread in Swift 6, but the compiler treats `deinit` as
+  ///   `nonisolated`. `MainActor.assumeIsolated` bridges this gap without
+  ///   incurring a hop — it's a compile-time assertion, not a runtime dispatch.
+  deinit {
+    MainActor.assumeIsolated {
+      loadTask?.cancel()
+      saveTask?.cancel()
+      analyzeTask?.cancel()
+    }
+  }
 }
