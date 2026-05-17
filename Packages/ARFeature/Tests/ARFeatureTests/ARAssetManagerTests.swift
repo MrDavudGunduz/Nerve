@@ -279,11 +279,11 @@ struct NewsItemARExtensionTests {
     #expect(item.arModelName == nil)
   }
 
-  @Test("Health category is not AR capable")
-  func healthIsNotARCapable() {
+  @Test("Health category is AR capable")
+  func healthIsARCapable() {
     let item = makeItem(category: .health)
-    #expect(item.isARCapable == false)
-    #expect(item.arModelName == nil)
+    #expect(item.isARCapable == true)
+    #expect(item.arModelName == "health_dna")
   }
 
   @Test("Sports category is not AR capable")
@@ -307,11 +307,11 @@ struct NewsItemARExtensionTests {
     #expect(item.arModelName == nil)
   }
 
-  @Test("Environment category is not AR capable")
-  func environmentIsNotARCapable() {
+  @Test("Environment category is AR capable")
+  func environmentIsARCapable() {
     let item = makeItem(category: .environment)
-    #expect(item.isARCapable == false)
-    #expect(item.arModelName == nil)
+    #expect(item.isARCapable == true)
+    #expect(item.arModelName == "environment_globe")
   }
 
   @Test("Other category is not AR capable")
