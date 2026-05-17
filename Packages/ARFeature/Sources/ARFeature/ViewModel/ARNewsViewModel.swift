@@ -44,6 +44,17 @@ public enum ARModelState: Sendable, Equatable {
 /// The ViewModel does **not** import RealityKit or ARKit — it only manages
 /// state. Platform-specific rendering logic lives in the views.
 ///
+/// ## State Machine
+///
+/// ```
+/// idle → loading → loaded → (interactive)
+///                ↘ failed → (retry) → loading
+///
+/// Placement:
+/// coaching → surfaceDetected → animatingEntrance → placed
+///          ↘ (skip/timeout) → placed (floating fallback)
+/// ```
+///
 /// ## Concurrency
 ///
 /// Model loading is dispatched via structured concurrency (`Task`).
@@ -76,6 +87,48 @@ public final class ARNewsViewModel {
   /// Whether the informational overlay card is visible.
   public var isOverlayVisible: Bool = true
 
+  // MARK: - AR Session State
+
+  /// The current tracking quality reported by ARKit.
+  ///
+  /// Updated by the AR content view's session delegate.
+  /// Non-AR modes (SceneKit fallback) leave this as `.good`.
+  public private(set) var trackingQuality: ARTrackingQuality = .initializing
+
+  /// The current placement state for the entity in the AR session.
+  ///
+  /// Drives the coaching overlay visibility and entrance animation.
+  public private(set) var placementState: ARPlacementState = .coaching
+
+  /// Whether the coaching overlay should be displayed.
+  ///
+  /// Computed from ``placementState`` and ``ARNewsConfiguration/showCoachingOverlay``.
+  public var showCoaching: Bool {
+    guard ARNewsConfiguration.showCoachingOverlay else { return false }
+    return placementState == .coaching && viewerMode == .augmentedReality
+  }
+
+  /// The coaching state for the coaching overlay.
+  ///
+  /// Derived from ``trackingQuality`` and ``placementState``.
+  public var coachingState: CoachingState {
+    switch placementState {
+    case .coaching:
+      switch trackingQuality {
+      case .good, .limited:
+        return .scanning
+      case .initializing:
+        return .scanning
+      case .unavailable:
+        return .timeout
+      }
+    case .surfaceDetected:
+      return .detected
+    default:
+      return .scanning
+    }
+  }
+
   // MARK: - Dependencies
 
   private let assetManager: ARAssetManager
@@ -84,6 +137,14 @@ public final class ARNewsViewModel {
   // MARK: - Internal
 
   private var loadTask: Task<Void, Never>?
+  private var coachingTimeoutTask: Task<Void, Never>?
+
+  /// Tracked handle for the auto-advance delay after surface detection.
+  ///
+  /// Without tracking, a `reset()` during the 0.8s delay would not cancel
+  /// the pending `beginEntityPlacement()` call, causing a state corruption
+  /// where placement begins after the ViewModel has been reset.
+  private var surfaceAdvanceTask: Task<Void, Never>?
 
   private static let logger = Logger(
     subsystem: "com.davudgunduz.Nerve.ARFeature",
@@ -107,6 +168,12 @@ public final class ARNewsViewModel {
     self.assetManager = assetManager
     self.capabilityChecker = capabilityChecker
     self.viewerMode = capabilityChecker.recommendedViewerMode
+
+    // Non-AR modes skip the coaching flow entirely.
+    if viewerMode != .augmentedReality {
+      placementState = .placed
+      trackingQuality = .good
+    }
   }
 
   // MARK: - Model Loading
@@ -142,6 +209,7 @@ public final class ARNewsViewModel {
           self.modelURL = localURL
           self.modelState = .loaded
           Self.logger.info("Model '\(modelName)' loaded from local storage.")
+          startCoachingTimeout()
           return
         }
 
@@ -152,6 +220,7 @@ public final class ARNewsViewModel {
           self.modelURL = localURL
           self.modelState = .loaded
           Self.logger.info("Model '\(modelName)' downloaded and cached.")
+          startCoachingTimeout()
         } else {
           self.modelState = .failed("Model download succeeded but file not found.")
           Self.logger.error("Model '\(modelName)' cached but localURL returned nil.")
@@ -169,6 +238,10 @@ public final class ARNewsViewModel {
   public func cancelLoading() {
     loadTask?.cancel()
     loadTask = nil
+    coachingTimeoutTask?.cancel()
+    coachingTimeoutTask = nil
+    surfaceAdvanceTask?.cancel()
+    surfaceAdvanceTask = nil
     if modelState == .loading {
       modelState = .idle
     }
@@ -184,6 +257,88 @@ public final class ARNewsViewModel {
     currentScale = 1.0
     currentRotation = 0.0
     isOverlayVisible = true
+
+    // Mirror init() logic: non-AR modes skip coaching entirely.
+    if viewerMode == .augmentedReality {
+      trackingQuality = .initializing
+      placementState = .coaching
+    } else {
+      trackingQuality = .good
+      placementState = .placed
+    }
+  }
+
+  // MARK: - AR Session Updates
+
+  /// Updates the tracking quality from the AR session delegate.
+  ///
+  /// Called by the AR content view when ARKit reports tracking state changes.
+  ///
+  /// - Parameter quality: The new tracking quality.
+  public func updateTrackingQuality(_ quality: ARTrackingQuality) {
+    let previousQuality = trackingQuality
+    trackingQuality = quality
+
+    // Log significant transitions.
+    if previousQuality != quality {
+      Self.logger.info("Tracking quality changed: \(previousQuality.rawValue) → \(quality.rawValue)")
+    }
+  }
+
+  /// Called when a horizontal surface is detected by ARKit.
+  ///
+  /// Transitions the placement state from `.coaching` to `.surfaceDetected`
+  /// and schedules auto-advancement to placement after a brief pause.
+  /// The delay task is tracked via ``surfaceAdvanceTask`` so it can be
+  /// cancelled if ``reset()`` or ``cancelLoading()`` is called.
+  public func onSurfaceDetected() {
+    guard placementState == .coaching else { return }
+
+    placementState = .surfaceDetected
+    Self.logger.info("Horizontal surface detected.")
+
+    // Auto-advance to placement after a brief pause.
+    // Tracked so reset()/cancelLoading() can cancel it.
+    surfaceAdvanceTask?.cancel()
+    surfaceAdvanceTask = Task { [weak self] in
+      try? await Task.sleep(for: .seconds(0.8))
+      guard let self, !Task.isCancelled,
+        self.placementState == .surfaceDetected
+      else { return }
+      self.beginEntityPlacement()
+    }
+  }
+
+  /// Transitions to the entrance animation state.
+  ///
+  /// Called when the entity is about to be placed on the detected surface.
+  public func beginEntityPlacement() {
+    placementState = .animatingEntrance
+    Self.logger.info("Beginning entity placement with entrance animation.")
+
+    #if os(iOS)
+      ARHapticEngine.playPlacement()
+    #endif
+  }
+
+  /// Marks the entity as fully placed and interactive.
+  ///
+  /// Called after the entrance animation completes.
+  public func completeEntityPlacement() {
+    placementState = .placed
+    Self.logger.info("Entity placement complete. Model is interactive.")
+  }
+
+  /// Skips the coaching overlay and places the model immediately.
+  ///
+  /// Used when the user taps "Skip" or the coaching timeout fires.
+  /// The model is placed at a default distance in front of the camera.
+  public func skipCoaching() {
+    coachingTimeoutTask?.cancel()
+    coachingTimeoutTask = nil
+
+    Self.logger.info("Coaching skipped. Using fallback placement.")
+    beginEntityPlacement()
   }
 
   // MARK: - Gesture State
@@ -193,10 +348,19 @@ public final class ARNewsViewModel {
   /// - Parameter proposedScale: The raw scale from the gesture recognizer.
   /// - Returns: The clamped scale value.
   public func clampedScale(_ proposedScale: Float) -> Float {
-    min(
+    let clamped = min(
       max(proposedScale, ARNewsConfiguration.minScale),
       ARNewsConfiguration.maxScale
     )
+
+    // Trigger haptic if hitting limits.
+    #if os(iOS)
+      if clamped != proposedScale {
+        ARHapticEngine.playLimitReached()
+      }
+    #endif
+
+    return clamped
   }
 
   // MARK: - Convenience
@@ -218,5 +382,26 @@ public final class ARNewsViewModel {
   private var isRetryableState: Bool {
     if case .failed = modelState { return true }
     return false
+  }
+
+  /// Starts the coaching timeout timer.
+  ///
+  /// If no surface is detected within ``ARNewsConfiguration/coachingTimeoutDuration``,
+  /// the coaching overlay is automatically dismissed and the model is placed
+  /// at a default position.
+  private func startCoachingTimeout() {
+    guard viewerMode == .augmentedReality,
+      placementState == .coaching
+    else { return }
+
+    coachingTimeoutTask = Task { [weak self] in
+      try? await Task.sleep(
+        for: .seconds(ARNewsConfiguration.coachingTimeoutDuration)
+      )
+
+      guard let self, self.placementState == .coaching else { return }
+      Self.logger.warning("Coaching timed out after \(ARNewsConfiguration.coachingTimeoutDuration)s.")
+      self.skipCoaching()
+    }
   }
 }

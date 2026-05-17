@@ -16,7 +16,8 @@ import SwiftUI
 /// ## Platform Behavior
 ///
 /// - **iOS 18+ with ARKit:** Full camera-based AR with RealityView,
-///   plane detection, gesture-based manipulation (drag, scale, rotate),
+///   plane detection, coaching overlay, entrance animation,
+///   haptic feedback, gesture-based manipulation (drag, scale, rotate),
 ///   and a floating overlay card.
 ///
 /// - **iOS 17:** Falls back to ``ModelViewerView`` using SceneKit.
@@ -38,6 +39,11 @@ import SwiftUI
 ///   │     ├── ARLoadingOverlay
 ///   │     ├── ARErrorOverlay
 ///   │     └── ARPlatformRouter → platform-adaptive 3D content
+///   │           ├── RealityKitARContentView (iOS 18+)
+///   │           │     ├── ARCoachingOverlay
+///   │           │     └── ARTrackingBanner
+///   │           ├── RealityKitSpatialContentView (visionOS)
+///   │           └── ModelViewerView (SceneKit fallback)
 ///   └── AROverlayToggle     → card + info button
 /// ```
 ///
@@ -79,15 +85,22 @@ public struct ARNewsView: View {
       // Model state machine → loading / loaded / error
       ARStateRouter(viewModel: viewModel)
 
-      // Overlay card + info toggle
-      AROverlayToggle(viewModel: viewModel)
+      // Overlay card + info toggle (only when model is placed/interactive)
+      if viewModel.placementState.isInteractive || viewModel.viewerMode != .augmentedReality {
+        AROverlayToggle(viewModel: viewModel)
+          .transition(.opacity.combined(with: .move(edge: .bottom)))
+      }
     }
+    .animation(.easeInOut(duration: 0.3), value: viewModel.placementState)
     .onAppear {
       viewModel.loadModel()
     }
     .onDisappear {
       viewModel.cancelLoading()
     }
+    #if os(iOS) || os(visionOS)
+    .statusBarHidden(viewModel.viewerMode == .augmentedReality)
+    #endif
   }
 }
 

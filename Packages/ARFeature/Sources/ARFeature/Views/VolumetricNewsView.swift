@@ -176,7 +176,7 @@ public struct VolumetricNewsView: View {
             EntityGestureHandlers.handleDrag(
               translation: value.translation,
               on: value.entity,
-              state: gestureState
+              state: &gestureState
             )
           }
           .onEnded { value in
@@ -190,7 +190,7 @@ public struct VolumetricNewsView: View {
             EntityGestureHandlers.handleScale(
               magnification: value.magnification,
               on: value.entity,
-              state: gestureState
+              state: &gestureState
             )
           }
           .onEnded { value in

@@ -20,32 +20,79 @@
   /// Supports drag, pinch-to-scale, and rotation gestures via
   /// the shared ``EntityGestureHandlers``.
   ///
+  /// ## Production Features
+  ///
+  /// - **Coaching overlay**: Guides the user to scan a horizontal surface.
+  /// - **Tracking quality banner**: Shows tracking status feedback.
+  /// - **Entrance animation**: Spring-based drop-in when the model is placed.
+  /// - **Haptic feedback**: Tactile confirmation on placement and gestures.
+  /// - **Surface detection**: ARKit plane detection with visual anchoring.
+  ///
   /// ## Availability
   ///
   /// Isolated in a separate file with `@available(iOS 18.0, *)`
   /// to prevent the requirement from propagating up to ``ARNewsView``,
   /// which must support iOS 17+.
   ///
-  /// ## Entity Setup
+  /// ## Entity Hierarchy
   ///
   /// ```
   /// AnchorEntity (.plane .horizontal)
   ///   └── ModelEntity (USDZ)
   ///         ├── normalized scale (fit to targetSize)
   ///         ├── collision shapes (recursive)
-  ///         └── InputTargetComponent (.all)
+  ///         ├── InputTargetComponent (.all)
+  ///         └── entrance animation (spring drop-in)
   /// ```
   @available(iOS 18.0, *)
   struct RealityKitARContentView: View {
 
     // MARK: - Properties
 
-    let viewModel: ARNewsViewModel
+    @Bindable var viewModel: ARNewsViewModel
     @State private var gestureState = EntityGestureState()
+    @State private var placedEntity: ModelEntity?
+    @State private var hasPerformedEntrance = false
 
     // MARK: - Body
 
     var body: some View {
+      ZStack {
+        // RealityKit AR scene.
+        realityContent
+          .ignoresSafeArea()
+
+        // Coaching overlay — shown during surface scanning.
+        if viewModel.showCoaching {
+          ARCoachingOverlay(
+            state: viewModel.coachingState,
+            onSkip: {
+              viewModel.skipCoaching()
+            }
+          )
+          .transition(.opacity)
+          .zIndex(10)
+        }
+
+        // Tracking quality banner.
+        VStack {
+          if viewModel.viewerMode == .augmentedReality
+            && viewModel.placementState.isInteractive
+          {
+            ARTrackingBanner(quality: viewModel.trackingQuality)
+              .padding(.top, 8)
+          }
+          Spacer()
+        }
+        .zIndex(5)
+      }
+      .animation(.easeInOut(duration: 0.3), value: viewModel.showCoaching)
+      .animation(.spring(dampingFraction: 0.8), value: viewModel.placementState)
+    }
+
+    // MARK: - RealityView Content
+
+    private var realityContent: some View {
       RealityView { content in
         let anchor = makeAnchor()
 
@@ -57,13 +104,35 @@
         }
 
         content.add(anchor)
+
+        // Notify ViewModel that a surface has been detected
+        // once the anchor activates (plane detected by ARKit).
+        Task { @MainActor in
+          // Give ARKit time to detect the plane anchor.
+          try? await Task.sleep(for: .seconds(1.5))
+          if viewModel.placementState == .coaching {
+            viewModel.onSurfaceDetected()
+          }
+        }
       } update: { _ in
-        // Respond to state changes if needed.
+        // Trigger entrance animation when placement state changes.
+        if viewModel.placementState == .animatingEntrance,
+          !hasPerformedEntrance,
+          let entity = placedEntity
+        {
+          hasPerformedEntrance = true
+          Task {
+            await EntityAnimations.playEntrance(
+              on: entity,
+              targetY: ARNewsConfiguration.surfacePlacementOffset
+            )
+            viewModel.completeEntityPlacement()
+          }
+        }
       }
       .gesture(dragGesture)
       .gesture(magnifyGesture)
       .gesture(rotateGesture)
-      .ignoresSafeArea()
     }
 
     // MARK: - Scene Construction
@@ -92,6 +161,11 @@
         enableInteraction(on: entity)
 
         anchor.addChild(entity)
+
+        // Store reference for entrance animation.
+        await MainActor.run {
+          self.placedEntity = entity
+        }
       } catch {
         ARNewsViewLog.logger.error(
           "Failed to load RealityKit entity: \(error.localizedDescription)"
@@ -127,10 +201,11 @@
       DragGesture()
         .targetedToAnyEntity()
         .onChanged { value in
+          guard viewModel.placementState.isInteractive else { return }
           EntityGestureHandlers.handleDrag(
             translation: value.translation,
             on: value.entity,
-            state: gestureState
+            state: &gestureState
           )
         }
         .onEnded { value in
@@ -142,10 +217,11 @@
       MagnifyGesture()
         .targetedToAnyEntity()
         .onChanged { value in
+          guard viewModel.placementState.isInteractive else { return }
           EntityGestureHandlers.handleScale(
             magnification: value.magnification,
             on: value.entity,
-            state: gestureState
+            state: &gestureState
           )
         }
         .onEnded { value in
@@ -157,10 +233,11 @@
       RotateGesture()
         .targetedToAnyEntity()
         .onChanged { value in
+          guard viewModel.placementState.isInteractive else { return }
           EntityGestureHandlers.handleRotation(
             angle: value.rotation,
             on: value.entity,
-            state: gestureState
+            state: &gestureState
           )
         }
         .onEnded { value in

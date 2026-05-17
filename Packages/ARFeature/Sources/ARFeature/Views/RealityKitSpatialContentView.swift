@@ -89,7 +89,7 @@
           EntityGestureHandlers.handleDrag(
             translation: value.translation,
             on: value.entity,
-            state: gestureState
+            state: &gestureState
           )
         }
         .onEnded { value in
@@ -104,7 +104,7 @@
           EntityGestureHandlers.handleScale(
             magnification: value.magnification,
             on: value.entity,
-            state: gestureState
+            state: &gestureState
           )
         }
         .onEnded { value in

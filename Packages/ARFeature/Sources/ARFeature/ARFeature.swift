@@ -11,8 +11,9 @@ import Core
 /// news exploration.
 ///
 /// On **iOS**, renders USDZ models anchored to real-world surfaces
-/// via ARKit with gesture-based manipulation (drag, scale, rotate)
-/// and a floating SwiftUI overlay card.
+/// via ARKit with gesture-based manipulation (drag, scale, rotate),
+/// a coaching overlay for surface detection guidance, haptic feedback,
+/// spring-based entrance animations, and a floating SwiftUI overlay card.
 ///
 /// On **visionOS**, provides:
 /// - **Volumetric windows** — detach 3D news models into the user's space.
@@ -30,14 +31,21 @@ import Core
 /// - ``VolumetricNewsView`` — visionOS volumetric window content.
 /// - ``SpatialMapView`` — visionOS immersive space content.
 /// - ``AROverlayCard`` — Floating headline + credibility badge overlay.
+/// - ``ARCoachingOverlay`` — Guided surface detection overlay.
+/// - ``ARTrackingBanner`` — Compact tracking quality indicator.
 ///
 /// ### Architecture
 ///
-/// - ``ARNewsViewModel`` — Drives model loading state and gesture transforms.
+/// - ``ARNewsViewModel`` — Drives model loading state, placement lifecycle,
+///   tracking quality, and gesture transforms.
 /// - ``ARAssetManager`` — Actor-isolated USDZ caching and resolution.
 /// - ``ARCapabilityChecker`` — Device capability detection.
 /// - ``ARNewsConfiguration`` — Centralized tuning parameters.
-/// - ``EntityGestureHandlers`` — Reusable RealityKit gesture logic.
+/// - ``EntityGestureHandlers`` — Reusable RealityKit gesture logic with haptics.
+/// - ``EntityAnimations`` — Spring-based entrance, exit, and pulse animations.
+/// - ``ARHapticEngine`` — Core Haptics feedback for AR interactions (iOS).
+/// - ``ARTrackingQuality`` — Tracking state value types.
+/// - ``ARPlacementState`` — Entity placement lifecycle state machine.
 ///
 /// ## Integration
 ///

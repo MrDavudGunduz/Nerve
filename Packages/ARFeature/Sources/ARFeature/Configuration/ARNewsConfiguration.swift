@@ -84,4 +84,60 @@ public struct ARNewsConfiguration: Sendable {
 
   /// Rotation speed of the placeholder (radians per second).
   public static let placeholderRotationSpeed: Float = 1.5
+
+  // MARK: - Coaching Overlay
+
+  /// Whether to show the ARKit coaching overlay on session start.
+  ///
+  /// When `true`, a semi-transparent instructional overlay guides the user
+  /// to scan a horizontal surface before model placement.
+  public static let showCoachingOverlay: Bool = true
+
+  /// Maximum duration (seconds) to show coaching before auto-dismissing.
+  ///
+  /// Prevents the coaching overlay from blocking the experience indefinitely
+  /// if the user is in a valid but challenging environment.
+  public static let coachingTimeoutDuration: TimeInterval = 15.0
+
+  /// Delay (seconds) before coaching overlay appears after session start.
+  ///
+  /// Gives ARKit a brief moment to initialize before showing guidance.
+  public static let coachingAppearanceDelay: TimeInterval = 0.5
+
+  // MARK: - Haptic Feedback
+
+  /// Haptic intensity for entity placement on a surface (0.0 – 1.0).
+  public static let placementHapticIntensity: Float = 0.8
+
+  /// Haptic intensity for gesture interaction start (0.0 – 1.0).
+  public static let gestureStartHapticIntensity: Float = 0.4
+
+  /// Haptic intensity for scale/rotation limit reached (0.0 – 1.0).
+  public static let limitReachedHapticIntensity: Float = 0.6
+
+  // MARK: - Entrance Animation
+
+  /// Scale factor at the start of the entrance animation.
+  ///
+  /// The model spawns at this scale and springs to 1.0.
+  public static let entranceStartScale: Float = 0.01
+
+  /// Y-axis offset (meters) for the drop-in entrance animation.
+  ///
+  /// The model drops from this offset above its target position.
+  public static let entranceDropOffset: Float = 0.15
+
+  /// Spring response (seconds) for the entrance animation.
+  public static let entranceSpringResponse: Float = 0.5
+
+  /// Spring damping fraction for the entrance animation.
+  public static let entranceSpringDamping: Float = 0.7
+
+  // MARK: - Tracking Quality
+
+  /// Minimum number of feature points for "good" tracking quality.
+  public static let goodTrackingFeaturePointThreshold: Int = 100
+
+  /// Duration (seconds) of insufficient tracking before showing a warning.
+  public static let trackingWarningDelay: TimeInterval = 3.0
 }
