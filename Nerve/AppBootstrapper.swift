@@ -6,13 +6,16 @@
 //
 
 import AILayer
-import ARFeature
 import Core
 import MapFeature
 import NetworkLayer
 import OSLog
 import StorageLayer
 import SwiftData
+
+#if canImport(ARFeature)
+  import ARFeature
+#endif
 
 // MARK: - AppBootstrapper
 
@@ -94,9 +97,12 @@ enum AppBootstrapper {
     // MARK: - AR / Spatial Computing
 
     // Production: actor-isolated AR capability detection and USDZ asset management.
-    await container.register(ARServiceProtocol.self, lifetime: .singleton) {
-      ARService()
-    }
+    // Only registered on platforms where ARFeature (RealityKit/ARKit) is available.
+    #if canImport(ARFeature)
+      await container.register(ARServiceProtocol.self, lifetime: .singleton) {
+        ARService()
+      }
+    #endif
 
     // MARK: - Location (CoreLocation)
 
