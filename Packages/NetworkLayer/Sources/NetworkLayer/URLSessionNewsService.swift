@@ -24,6 +24,15 @@ import OSLog
 ///   intermediate ``NewsItemDTO`` (Data Transfer Object).
 /// - HTTP error classification determines retry eligibility.
 ///
+/// ## URLSession Lifecycle
+///
+/// Each `URLSessionNewsService` instance creates its own `URLSession` via
+/// ``NetworkConfiguration/makeURLSession()``. This is **intentional** —
+/// per-instance sessions prevent cross-contamination of cookies, caches,
+/// and authentication state between different configuration environments
+/// (production vs. staging vs. development). Since the service is registered
+/// as a singleton in ``AppBootstrapper``, only one session exists at runtime.
+///
 /// ## Thread Safety
 ///
 /// `URLSessionNewsService` is a value type (`struct`) conforming to
@@ -80,7 +89,7 @@ public struct URLSessionNewsService: NewsServiceProtocol {
   /// - Returns: An array of ``NewsItem`` instances (may be empty).
   /// - Throws: ``NerveError/network(message:context:)`` on unrecoverable failure.
   public func fetchNews(for region: GeoRegion) async throws -> [NewsItem] {
-    let url = buildFetchURL(for: region)
+    let url = try buildFetchURL(for: region)
 
     Self.logger.info(
       "Fetching news for region center=(\(region.center.latitude), \(region.center.longitude)), radius=\(region.radiusMeters)m"
@@ -113,11 +122,16 @@ public struct URLSessionNewsService: NewsServiceProtocol {
 
   /// Fetches the full details of a single news item.
   ///
+  /// The `id` is percent-encoded before path construction to prevent
+  /// malformed URLs when the upstream API returns IDs containing
+  /// reserved characters (`/`, `%`, `?`, `#`, etc.).
+  ///
   /// - Parameter id: The unique identifier of the news item.
   /// - Returns: The matching ``NewsItem``.
   /// - Throws: ``NerveError/network(message:context:)`` on failure.
   public func fetchNewsDetail(id: String) async throws -> NewsItem {
-    let url = configuration.baseURL.appendingPathComponent("news/\(id)")
+    let sanitizedID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+    let url = configuration.baseURL.appendingPathComponent("news/\(sanitizedID)")
 
     do {
       let data = try await RetryPolicy.execute(
@@ -146,15 +160,25 @@ public struct URLSessionNewsService: NewsServiceProtocol {
   // MARK: - URL Construction
 
   /// Builds the fetch URL with bounding-box query parameters.
-  private func buildFetchURL(for region: GeoRegion) -> URL {
+  ///
+  /// - Parameter region: The geographic region to construct the query for.
+  /// - Returns: A fully-formed URL with bounding-box query parameters.
+  /// - Throws: ``NerveError/network(message:)`` if the base URL cannot be
+  ///   decomposed into `URLComponents` or the final URL is invalid.
+  private func buildFetchURL(for region: GeoRegion) throws -> URL {
     // Approximate bounding box: 1° latitude ≈ 111 km.
     let latDelta = region.radiusMeters / 111_000
     let lonDelta = region.radiusMeters / (111_000 * cos(region.center.latitude * .pi / 180))
 
-    var components = URLComponents(
+    guard var components = URLComponents(
       url: configuration.baseURL.appendingPathComponent("news"),
       resolvingAgainstBaseURL: false
-    )!
+    ) else {
+      throw NerveError.network(
+        message: "Failed to construct URLComponents from base URL: \(configuration.baseURL)",
+        reason: .other
+      )
+    }
 
     components.queryItems = [
       URLQueryItem(name: "min_lat", value: String(region.center.latitude - latDelta)),
@@ -164,16 +188,28 @@ public struct URLSessionNewsService: NewsServiceProtocol {
       URLQueryItem(name: "limit", value: "200"),
     ]
 
-    return components.url!
+    guard let url = components.url else {
+      throw NerveError.network(
+        message: "Failed to construct URL from components: \(components)",
+        reason: .other
+      )
+    }
+
+    return url
   }
 
   // MARK: - Response Validation
 
   /// Validates the HTTP response and throws domain errors for non-success codes.
+  ///
+  /// Each error case populates ``NetworkErrorReason`` so that upstream callers
+  /// (e.g. ``MapViewModel`` data pipeline) can make structured retry decisions
+  /// via ``NetworkErrorReason/isRetryable`` instead of brittle string matching.
   private static func validateHTTPResponse(_ response: URLResponse, data: Data) throws {
     guard let httpResponse = response as? HTTPURLResponse else {
       throw NerveError.network(
-        message: "Invalid response type — expected HTTPURLResponse."
+        message: "Invalid response type — expected HTTPURLResponse.",
+        reason: .other
       )
     }
 
@@ -182,23 +218,28 @@ public struct URLSessionNewsService: NewsServiceProtocol {
       return  // Success — no action needed.
     case 401, 403:
       throw NerveError.network(
-        message: "Authentication failed (HTTP \(httpResponse.statusCode))."
+        message: "Authentication failed (HTTP \(httpResponse.statusCode)).",
+        reason: .unauthorized
       )
     case 404:
       throw NerveError.network(
-        message: "Resource not found (HTTP 404)."
+        message: "Resource not found (HTTP 404).",
+        reason: .notFound
       )
     case 429:
       throw NerveError.network(
-        message: "Rate limited (HTTP 429). Retrying after backoff."
+        message: "Rate limited (HTTP 429). Retrying after backoff.",
+        reason: .rateLimited
       )
     case 500...599:
       throw NerveError.network(
-        message: "Server error (HTTP \(httpResponse.statusCode))."
+        message: "Server error (HTTP \(httpResponse.statusCode)).",
+        reason: .serverError
       )
     default:
       throw NerveError.network(
-        message: "Unexpected HTTP status \(httpResponse.statusCode)."
+        message: "Unexpected HTTP status \(httpResponse.statusCode).",
+        reason: .other
       )
     }
   }
@@ -206,6 +247,9 @@ public struct URLSessionNewsService: NewsServiceProtocol {
   // MARK: - Retry Classification
 
   /// Determines whether an error is transient and worth retrying.
+  ///
+  /// Uses structured ``NetworkErrorReason/isRetryable`` for `NerveError`
+  /// classifications instead of brittle string matching.
   ///
   /// Retryable errors include:
   /// - URL timeouts and network connectivity issues
@@ -227,12 +271,12 @@ public struct URLSessionNewsService: NewsServiceProtocol {
       }
     }
 
-    // NerveError classification.
+    // NerveError classification — use structured reason for deterministic
+    // retry decisions instead of string matching.
     if let nerveError = error as? NerveError {
       switch nerveError {
-      case .network(let message, _):
-        // Retry on 429 and 5xx.
-        return message.contains("429") || message.contains("Server error")
+      case .network(_, let reason, _):
+        return reason?.isRetryable ?? false
       default:
         return false
       }

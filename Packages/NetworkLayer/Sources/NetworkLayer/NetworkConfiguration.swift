@@ -145,7 +145,7 @@ public struct NetworkConfiguration: Sendable {
     var headers: [String: String] = [
       "Accept": "application/json",
       "Content-Type": "application/json",
-      "User-Agent": "Nerve/1.0 (Apple; iOS)",
+      "User-Agent": Self.userAgent,
     ]
 
     if let apiKey {
@@ -159,4 +159,27 @@ public struct NetworkConfiguration: Sendable {
 
     return headers
   }
+
+  /// Dynamically built User-Agent string reflecting the actual app version and platform.
+  ///
+  /// Format: `Nerve/<version> (<platform>; <os> <osVersion>)`
+  /// Example: `Nerve/1.2.0 (Apple; iOS 17.5)`
+  private static let userAgent: String = {
+    let bundle = Bundle.main
+    let appVersion = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+    let buildNumber = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
+
+    #if os(iOS)
+      let platform = "iOS"
+    #elseif os(macOS)
+      let platform = "macOS"
+    #elseif os(visionOS)
+      let platform = "visionOS"
+    #else
+      let platform = "Apple"
+    #endif
+
+    let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
+    return "Nerve/\(appVersion).\(buildNumber) (Apple; \(platform) \(osVersion))"
+  }()
 }

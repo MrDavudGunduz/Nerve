@@ -128,6 +128,10 @@ public actor URLSessionImageService: ImageServiceProtocol {
     }
 
     // ── L3: Network Download ──
+    // Register the task BEFORE awaiting its value to close the actor
+    // reentrancy gap. Without this, a second call arriving during the
+    // `await downloadTask.value` suspension could bypass the inflight
+    // check (line 125) and start a duplicate download.
     let downloadTask = Task<Data, any Error> { [session] in
       let data = try await RetryPolicy.execute(
         maxAttempts: 2,
@@ -161,6 +165,8 @@ public actor URLSessionImageService: ImageServiceProtocol {
       return data
     }
 
+    // Register inflight task immediately — before any suspension point —
+    // so that concurrent calls coalesce on this task's result.
     inflightRequests[url] = downloadTask
 
     do {
