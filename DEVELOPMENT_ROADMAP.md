@@ -339,11 +339,11 @@ Deliver the **"wow factor"** — bring news stories to life with AR on iOS/macOS
 
 #### 4.1 — iOS/macOS: AR News Viewer
 
-- [ ] Implement an `ARNewsViewController` that activates when a user taps an AR-eligible story (e.g., tech product launch).
-- [ ] Use ARKit **plane detection** to anchor a 3D USDZ model on a detected horizontal surface (table, desk).
-- [ ] Integrate gesture recognizers for **rotate**, **scale**, and **reposition** interactions.
-- [ ] Add an informational **SwiftUI overlay** with headline, source, and credibility badge rendered as a floating card.
-- [ ] Implement graceful degradation: devices without AR capability show a 3D model viewer (SceneKit fallback).
+- [x] Implement an `ARNewsViewController` that activates when a user taps an AR-eligible story (e.g., tech product launch).
+- [x] Use ARKit **plane detection** to anchor a 3D USDZ model on a detected horizontal surface (table, desk).
+- [x] Integrate gesture recognizers for **rotate**, **scale**, and **reposition** interactions.
+- [x] Add an informational **SwiftUI overlay** with headline, source, and credibility badge rendered as a floating card.
+- [x] Implement graceful degradation: devices without AR capability show a 3D model viewer (SceneKit fallback).
 
 ```swift
 struct ARNewsView: View {

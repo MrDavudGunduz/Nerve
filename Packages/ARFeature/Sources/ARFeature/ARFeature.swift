@@ -26,7 +26,8 @@ import Core
 ///
 /// ### Views
 ///
-/// - ``ARNewsView`` — The primary entry point; adapts to device capabilities.
+/// - ``ARNewsView`` — The primary SwiftUI entry point; adapts to device capabilities.
+/// - ``ARNewsViewController`` — UIKit-hosted wrapper for UINavigationController integration.
 /// - ``ModelViewerView`` — SceneKit fallback for macOS / Simulator.
 /// - ``VolumetricNewsView`` — visionOS volumetric window content.
 /// - ``SpatialMapView`` — visionOS immersive space content.
@@ -44,18 +45,38 @@ import Core
 /// - ``EntityGestureHandlers`` — Reusable RealityKit gesture logic with haptics.
 /// - ``EntityAnimations`` — Spring-based entrance, exit, and pulse animations.
 /// - ``ARHapticEngine`` — Core Haptics feedback for AR interactions (iOS).
+/// - ``ARSessionCoordinator`` — ARKit session delegate bridge (iOS).
+/// - ``EntityLifecycleManager`` — VRAM-safe entity tracking and teardown.
 /// - ``ARTrackingQuality`` — Tracking state value types.
 /// - ``ARPlacementState`` — Entity placement lifecycle state machine.
+///
+/// ## AR-Eligible Categories
+///
+/// | Category       | USDZ Model         |
+/// |----------------|--------------------|
+/// | `.technology`  | `tech_device`      |
+/// | `.science`     | `science_model`    |
+/// | `.health`      | `health_dna`       |
+/// | `.environment` | `environment_globe`|
 ///
 /// ## Integration
 ///
 /// ```swift
-/// // In NerveApp.swift:
+/// // SwiftUI entry point:
+/// ARNewsView(newsItem: item)
+///   .navigationTitle("AR Preview")
+///
+/// // UIKit entry point:
+/// let arVC = ARNewsViewController(newsItem: item)
+/// navigationController?.pushViewController(arVC, animated: true)
+///
+/// // visionOS volumetric window:
 /// WindowGroup(id: "news-3d-viewer") {
 ///   VolumetricNewsView()
 /// }
 /// .windowStyle(.volumetric)
 ///
+/// // visionOS immersive space:
 /// ImmersiveSpace(id: "spatial-map") {
 ///   SpatialMapView()
 /// }
