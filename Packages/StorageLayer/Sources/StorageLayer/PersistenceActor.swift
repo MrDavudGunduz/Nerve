@@ -40,8 +40,18 @@ public actor PersistenceActor {
   /// Logger for persistence diagnostics including corrupt record detection.
   private let logger = Logger(subsystem: "com.davudgunduz.Nerve", category: "Persistence")
 
-  /// The time-to-live for cached news items (24 hours).
-  private static let cacheTTL: TimeInterval = 86_400
+  /// The time-to-live for cached news items.
+  ///
+  /// Defaults to 24 hours (86 400 seconds). Configurable via
+  /// ``init(modelContainer:cacheTTL:)`` for testing or per-environment tuning.
+  private let cacheTTL: TimeInterval
+
+  /// The default TTL applied when no custom value is provided (24 hours).
+  public static let defaultCacheTTL: TimeInterval = 86_400
+
+  /// Maximum number of expired records to delete per batch during pruning.
+  /// Prevents loading thousands of records into memory simultaneously.
+  private static let pruneBatchSize = 100
 
   // MARK: - Init
 
@@ -50,9 +60,14 @@ public actor PersistenceActor {
   /// A dedicated `ModelContext` is created from the container, owned
   /// exclusively by this actor for the lifetime of the object.
   ///
-  /// - Parameter modelContainer: The shared SwiftData container.
-  public init(modelContainer: ModelContainer) {
+  /// - Parameters:
+  ///   - modelContainer: The shared SwiftData container.
+  ///   - cacheTTL: How long cached items remain valid before pruning.
+  ///     Defaults to ``defaultCacheTTL`` (24 hours). Pass a shorter
+  ///     duration in tests for faster TTL verification.
+  public init(modelContainer: ModelContainer, cacheTTL: TimeInterval = PersistenceActor.defaultCacheTTL) {
     self.modelContext = ModelContext(modelContainer)
+    self.cacheTTL = cacheTTL
     // Disable autosave — we save explicitly after mutations.
     modelContext.autosaveEnabled = false
   }
@@ -184,17 +199,41 @@ public actor PersistenceActor {
 
   /// Deletes all cached items whose `cachedAt` timestamp exceeds the 24-hour TTL.
   ///
+  /// Fetches expired items in batches of ``pruneBatchSize`` to keep memory
+  /// bounded, but accumulates all deletes and performs a **single**
+  /// `modelContext.save()` at the end — reducing SQLite transaction overhead
+  /// from N round-trips (one per batch) to exactly one.
+  ///
   /// Intended to be called on app foreground or background refresh to keep
   /// storage bounded and data fresh.
   ///
   /// - Throws: If the SwiftData batch-delete or save fails.
   public func pruneExpired() async throws {
-    let expiryDate = Date(timeIntervalSinceNow: -Self.cacheTTL)
-    let descriptor = FetchDescriptor<NewsItemPersistenceModel>(
-      predicate: #Predicate { $0.cachedAt < expiryDate }
-    )
-    let expired = try modelContext.fetch(descriptor)
-    for record in expired { modelContext.delete(record) }
-    if !expired.isEmpty { try modelContext.save() }
+    let expiryDate = Date(timeIntervalSinceNow: -cacheTTL)
+    var totalPruned = 0
+
+    // Fetch and delete in batches to keep memory footprint bounded,
+    // but defer the save until all batches have been processed.
+    while true {
+      var descriptor = FetchDescriptor<NewsItemPersistenceModel>(
+        predicate: #Predicate { $0.cachedAt < expiryDate }
+      )
+      descriptor.fetchLimit = Self.pruneBatchSize
+
+      let expired = try modelContext.fetch(descriptor)
+      guard !expired.isEmpty else { break }
+
+      for record in expired { modelContext.delete(record) }
+      totalPruned += expired.count
+
+      // If we got fewer than a full batch, we're done.
+      if expired.count < Self.pruneBatchSize { break }
+    }
+
+    // Single atomic save for all accumulated deletes.
+    if totalPruned > 0 {
+      try modelContext.save()
+      logger.info("Pruned \(totalPruned) expired cache entries.")
+    }
   }
 }

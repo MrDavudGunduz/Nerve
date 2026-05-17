@@ -106,17 +106,21 @@ struct NewsItemPersistenceModelTests {
     }
   }
 
-  @Test("NewsItemPersistenceModel toDomainModel throws on unknown category")
-  func unknownCategoryThrows() throws {
+  @Test("NewsItemPersistenceModel toDomainModel gracefully falls back to .other for unknown category")
+  func unknownCategoryFallback() throws {
     let item = makeDomainItem()
     let model = NewsItemPersistenceModel(from: item)
 
     // Simulate a future category value not present in the current enum.
     model.categoryRaw = "unknown_future_category"
 
-    #expect(throws: NerveError.self) {
-      try model.toDomainModel()
-    }
+    // Should NOT throw — unknown categories fall back to .other to
+    // prevent data loss when the server introduces new categories
+    // before the app is updated (matches DTO defensive strategy).
+    let restored = try model.toDomainModel()
+    #expect(restored.category == .other)
+    #expect(restored.id == item.id)
+    #expect(restored.headline == item.headline)
   }
 }
 

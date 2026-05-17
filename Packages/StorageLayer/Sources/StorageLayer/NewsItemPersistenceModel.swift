@@ -35,26 +35,23 @@ import SwiftData
 @Model
 public final class NewsItemPersistenceModel {
 
-  // MARK: - Indexes (Future)
+  // MARK: - Indexes
 
-  /// Desired database indexes for spatial fetch queries and TTL pruning.
+  /// Database indexes for spatial fetch queries and TTL pruning.
   ///
   /// SwiftData (iOS 17) does not expose a public API for declarative index
   /// creation. The framework creates implicit indexes only for
   /// `@Attribute(.unique)` properties (e.g., ``id``).
   ///
   /// When the project's minimum deployment target is raised to iOS 18+,
-  /// add the following indexes using the `#Index` macro:
-  ///
-  /// ```swift
-  /// #Index<NewsItemPersistenceModel>([\.latitude, \.longitude])
-  /// #Index<NewsItemPersistenceModel>([\.publishedAt])
-  /// #Index<NewsItemPersistenceModel>([\.cachedAt])
-  /// ```
-  ///
-  /// Without explicit indexes, SwiftData performs full table scans on every
-  /// region-filtered fetch — this becomes noticeable when the local
-  /// store grows beyond a few hundred items.
+  /// uncomment the `#Index` macros below. Without these indexes, SwiftData
+  /// performs full table scans on every region-filtered fetch — noticeable
+  /// when the local store grows beyond a few hundred items.
+  //
+  // TODO: Uncomment when deployment target >= iOS 18 / macOS 15
+  // #Index<NewsItemPersistenceModel>([\.latitude, \.longitude])
+  // #Index<NewsItemPersistenceModel>([\.publishedAt])
+  // #Index<NewsItemPersistenceModel>([\.cachedAt])
 
   // MARK: - Stored Properties
 
@@ -138,7 +135,8 @@ public final class NewsItemPersistenceModel {
   ///
   /// - Returns: A ``Core/NewsItem`` populated from stored fields.
   /// - Throws: ``Core/NerveError`` if stored data is invalid
-  ///   (e.g., out-of-range coordinate or unknown category).
+  ///   (e.g., out-of-range coordinate). Unknown categories gracefully
+  ///   fall back to ``NewsCategory/other`` to prevent data loss.
   public func toDomainModel() throws -> NewsItem {
     guard let coordinate = GeoCoordinate(latitude: latitude, longitude: longitude) else {
       throw NerveError.storage(
@@ -146,11 +144,11 @@ public final class NewsItemPersistenceModel {
       )
     }
 
-    guard let category = NewsCategory(rawValue: categoryRaw) else {
-      throw NerveError.storage(
-        message: "Unknown category '\(categoryRaw)' for item '\(id)'."
-      )
-    }
+    // Fall back to `.other` for unrecognized category strings — matches
+    // the defensive strategy in `NewsItemDTO.toDomainModel()`. This prevents
+    // persisted records from becoming unfetchable when the server introduces
+    // new categories before the app is updated.
+    let category = NewsCategory(rawValue: categoryRaw) ?? .other
 
     // Reconstruct HeadlineAnalysis if all three fields are present.
     let analysis: HeadlineAnalysis?
