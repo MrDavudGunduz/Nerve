@@ -50,6 +50,47 @@ public struct ErrorContext: Sendable {
   }
 }
 
+// MARK: - NetworkErrorReason
+
+/// Structured classification of network failure modes.
+///
+/// Enables pattern-matching in retry logic instead of brittle string comparisons.
+/// Use in combination with ``NerveError/network(message:reason:context:)``
+/// for deterministic retry decisions.
+///
+/// ```swift
+/// case .network(_, let reason, _) where reason?.isRetryable == true:
+///   // safe to retry
+/// ```
+public enum NetworkErrorReason: String, Sendable, Codable, Equatable {
+  /// HTTP 429 Too Many Requests — the server is rate-limiting the client.
+  case rateLimited
+  /// HTTP 5xx — a transient server-side failure.
+  case serverError
+  /// The request did not complete within the configured timeout interval.
+  case timeout
+  /// The device has no active network connection.
+  case noConnection
+  /// The network connection was lost mid-request.
+  case connectionLost
+  /// HTTP 401/403 — the request lacks valid authentication credentials.
+  case unauthorized
+  /// HTTP 404 — the requested resource does not exist.
+  case notFound
+  /// A failure that does not fit any other category.
+  case other
+
+  /// Whether this error reason is transient and safe to retry with backoff.
+  public var isRetryable: Bool {
+    switch self {
+    case .rateLimited, .serverError, .timeout, .connectionLost:
+      return true
+    case .noConnection, .unauthorized, .notFound, .other:
+      return false
+    }
+  }
+}
+
 // MARK: - NerveError
 
 /// A unified error type for all recoverable failures across Nerve modules.
@@ -61,6 +102,7 @@ public struct ErrorContext: Sendable {
 /// ```swift
 /// throw NerveError.network(
 ///   message: "Request timed out after 30s",
+///   reason: .timeout,
 ///   context: ErrorContext(underlyingError: urlError)
 /// )
 /// ```
@@ -70,7 +112,12 @@ public struct ErrorContext: Sendable {
 public enum NerveError: Error, Sendable {
 
   /// A network request failed.
-  case network(message: String, context: ErrorContext? = nil)
+  ///
+  /// - Parameters:
+  ///   - message: Human-readable description of the failure.
+  ///   - reason: Structured classification for retry logic.
+  ///   - context: Optional diagnostic context.
+  case network(message: String, reason: NetworkErrorReason? = nil, context: ErrorContext? = nil)
 
   /// A persistence or storage operation failed.
   case storage(message: String, context: ErrorContext? = nil)
@@ -93,8 +140,8 @@ public enum NerveError: Error, Sendable {
 extension NerveError: Equatable {
   public static func == (lhs: NerveError, rhs: NerveError) -> Bool {
     switch (lhs, rhs) {
-    case (.network(let lMsg, _), .network(let rMsg, _)):
-      return lMsg == rMsg
+    case (.network(let lMsg, let lReason, _), .network(let rMsg, let rReason, _)):
+      return lMsg == rMsg && lReason == rReason
     case (.storage(let lMsg, _), .storage(let rMsg, _)):
       return lMsg == rMsg
     case (.ai(let lMsg, _), .ai(let rMsg, _)):
@@ -137,7 +184,9 @@ extension NerveError: LocalizedError {
 extension NerveError: CustomDebugStringConvertible {
   public var debugDescription: String {
     switch self {
-    case .network(let message, _): return "[NerveError.network] \(message)"
+    case .network(let message, let reason, _):
+      let suffix = reason.map { " (reason: \($0.rawValue))" } ?? ""
+      return "[NerveError.network] \(message)\(suffix)"
     case .storage(let message, _): return "[NerveError.storage] \(message)"
     case .ai(let message, _): return "[NerveError.ai] \(message)"
     case .location(let message, _): return "[NerveError.location] \(message)"

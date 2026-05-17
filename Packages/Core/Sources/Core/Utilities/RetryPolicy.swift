@@ -142,8 +142,8 @@ public enum RetryPolicy: Sendable {
           """
         )
 
-        // Sleep with nanosecond precision.
-        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+        // Sleep using Duration API (replaces deprecated nanosecond-based sleep).
+        try await Task.sleep(for: .seconds(delay))
 
         // Grow the delay for the next iteration.
         currentDelay = min(currentDelay * multiplier, maxDelay)

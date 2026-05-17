@@ -7,6 +7,7 @@
 
 import OSLog
 import SwiftUI
+import os
 
 // MARK: - Environment Key
 
@@ -56,6 +57,21 @@ private let environmentLogger = Logger(
   category: "Environment"
 )
 
+/// Thread-safe boolean flag using `os_unfair_lock` for low-overhead atomic access.
+///
+/// Replaces the previous `nonisolated(unsafe) var` which suppressed the
+/// compiler's data race detection rather than preventing the race itself.
+/// `os_unfair_lock` is the lightest synchronization primitive available on
+/// Apple platforms — zero syscall overhead in the uncontended case.
+private final class AtomicFlag: Sendable {
+  private let _lock = OSAllocatedUnfairLock(initialState: false)
+
+  var value: Bool {
+    get { _lock.withLock { $0 } }
+    set { _lock.withLock { $0 = newValue } }
+  }
+}
+
 /// Process-level flag set after the first successful injection.
 ///
 /// During normal SwiftUI startup, `EnvironmentValues` getters are
@@ -63,7 +79,7 @@ private let environmentLogger = Logger(
 /// at that stage produces false-positive noise. This flag suppresses
 /// the warning until at least one injection has occurred — after which
 /// an uninjected access is genuinely unexpected.
-private nonisolated(unsafe) var hasEverBeenInjected = false
+private let hasEverBeenInjected = AtomicFlag()
 
 // MARK: - EnvironmentValues Extension
 
@@ -81,7 +97,7 @@ extension EnvironmentValues {
       // Only warn after at least one injection has occurred in this process.
       // Before that, SwiftUI is still assembling the view hierarchy —
       // reading the default value is expected lifecycle behavior.
-      if hasEverBeenInjected && !self[DependencyContainerInjectedKey.self] {
+      if hasEverBeenInjected.value && !self[DependencyContainerInjectedKey.self] {
         environmentLogger.warning(
           """
           DependencyContainer accessed but not yet injected. \
@@ -96,7 +112,7 @@ extension EnvironmentValues {
     set {
       self[DependencyContainerKey.self] = newValue
       self[DependencyContainerInjectedKey.self] = true
-      hasEverBeenInjected = true
+      hasEverBeenInjected.value = true
     }
   }
 }
