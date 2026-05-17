@@ -27,6 +27,8 @@
   /// - **Entrance animation**: Spring-based drop-in when the model is placed.
   /// - **Haptic feedback**: Tactile confirmation on placement and gestures.
   /// - **Surface detection**: ARKit plane detection with visual anchoring.
+  /// - **Entity lifecycle management**: Deterministic VRAM cleanup on dismiss.
+  /// - **Exit animation**: Smooth shrink-and-lift before entity removal.
   ///
   /// ## Availability
   ///
@@ -53,6 +55,7 @@
     @State private var gestureState = EntityGestureState()
     @State private var placedEntity: ModelEntity?
     @State private var hasPerformedEntrance = false
+    @State private var lifecycleManager = EntityLifecycleManager()
 
     // MARK: - Body
 
@@ -88,6 +91,22 @@
       }
       .animation(.easeInOut(duration: 0.3), value: viewModel.showCoaching)
       .animation(.spring(dampingFraction: 0.8), value: viewModel.placementState)
+      .onDisappear {
+        // Deterministic VRAM cleanup — prevents GPU resource leaks.
+        if let entity = placedEntity {
+          Task {
+            await EntityAnimations.playExit(on: entity)
+          }
+        }
+        lifecycleManager.teardownAll()
+        placedEntity = nil
+        hasPerformedEntrance = false
+      }
+      .accessibilityElement(children: .contain)
+      .accessibilityLabel("AR scene with 3D model")
+      .accessibilityHint(
+        "Drag to reposition, pinch to scale, rotate with two fingers"
+      )
     }
 
     // MARK: - RealityView Content
@@ -95,12 +114,14 @@
     private var realityContent: some View {
       RealityView { content in
         let anchor = makeAnchor()
+        lifecycleManager.track(anchor)
 
         if let modelURL = viewModel.modelURL {
           await loadAndAttach(url: modelURL, to: anchor)
         } else {
           let placeholder = PlaceholderEntity.create()
           anchor.addChild(placeholder)
+          lifecycleManager.track(placeholder)
         }
 
         content.add(anchor)
@@ -161,6 +182,7 @@
         enableInteraction(on: entity)
 
         anchor.addChild(entity)
+        lifecycleManager.track(entity)
 
         // Store reference for entrance animation.
         await MainActor.run {

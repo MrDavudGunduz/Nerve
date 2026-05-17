@@ -115,7 +115,7 @@ public struct SpatialMapView: View {
         tint: .systemGray.withAlphaComponent(0.3),
         texture: nil
       )
-      material.metalness = .init(floatLiteral: 0.1)
+      material.metallic = .init(floatLiteral: 0.1)
       material.roughness = .init(floatLiteral: 0.9)
 
       let entity = ModelEntity(mesh: mesh, materials: [material])
@@ -143,7 +143,7 @@ public struct SpatialMapView: View {
         tint: categoryColor(for: item.category),
         texture: nil
       )
-      markerMaterial.metalness = .init(floatLiteral: 0.5)
+      markerMaterial.metallic = .init(floatLiteral: 0.5)
       markerMaterial.roughness = .init(floatLiteral: 0.3)
 
       let marker = ModelEntity(mesh: markerMesh, materials: [markerMaterial])

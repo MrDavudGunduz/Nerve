@@ -98,9 +98,13 @@ public struct ARNewsView: View {
     .onDisappear {
       viewModel.cancelLoading()
     }
+    .navigationTitle("AR Preview")
     #if os(iOS) || os(visionOS)
+    .navigationBarTitleDisplayMode(.inline)
     .statusBarHidden(viewModel.viewerMode == .augmentedReality)
     #endif
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("AR news viewer for \(viewModel.newsItem.headline)")
   }
 }
 
