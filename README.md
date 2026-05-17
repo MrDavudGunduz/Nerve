@@ -65,7 +65,7 @@
 - **Volumetric Windows** — detach 3D news models into your physical space.
 - **Immersive Map** — walk around a topographical news landscape.
 - Gaze + pinch interaction for selecting spatial annotations.
-- Spatial audio feedback on interaction events.
+- Spatial audio feedback on interaction events. *(Planned)*
 
 ---
 

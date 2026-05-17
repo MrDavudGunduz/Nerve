@@ -11,6 +11,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Structured Network Error Classification** (`Core/Models/NerveError.swift`)
+  - `NetworkErrorReason` enum with 8 cases: `.rateLimited`, `.serverError`, `.timeout`, `.noConnection`, `.connectionLost`, `.unauthorized`, `.notFound`, `.other`.
+  - `isRetryable` computed property for deterministic retry decisions.
+  - `NerveError.network` updated with optional `reason:` parameter (backward-compatible default nil).
+
+- **Performance Benchmark Tests** (`MapFeature/Tests/ClusteringPerformanceTests.swift`)
+  - 1K item clustering performance test (< 100ms target).
+  - 500 item clustering performance test (< 50ms target).
+  - 2K item scaling test (< 250ms target).
+  - Merge radius exponential decay verification.
+
+- **Data Pipeline Integration Tests** (`MapFeature/Tests/DataPipelineIntegrationTests.swift`)
+  - End-to-end: network → storage → viewmodel → clustering → UI state.
+  - Category filter integration with cluster count verification.
+  - Memory cap trim validation.
+  - Reset state verification.
+
+- **NetworkErrorReason Test Suite** (`Core/Tests/NetworkErrorReasonTests.swift`)
+  - Retryable/non-retryable classification.
+  - Codable round-trip safety.
+  - NerveError.Equatable reason comparison.
+  - Debug description format verification.
+
+- **CI/CD: Code Coverage Gate**
+  - Enforces ≥ 80% line coverage on `Core`, `NetworkLayer`, `StorageLayer`, `AILayer`.
+  - Coverage extracted via `xcrun xccov` from `.xcresult` bundles.
+
+- **CI/CD: SwiftLint Job**
+  - Runs SwiftLint `--strict` before any build/test jobs.
+  - Uses `github-actions-logging` reporter for inline annotations.
+
+### Changed
+
+- **`AppBootstrapper`**: Wrapped `import ARFeature` and `ARService` registration in `#if canImport(ARFeature)` to prevent build failures on macOS-only targets (audit A-1).
+
+- **`MapViewModel+DataPipeline`**: Retry logic now uses `NetworkErrorReason.isRetryable` instead of brittle `msg.contains()` string matching (audit N-2).
+
+- **`NetworkConfiguration`**: User-Agent header built dynamically from `Bundle.main` metadata, reflecting actual platform (iOS/macOS/visionOS) and app version (audit N-4).
+
+- **`PersistenceActor.pruneExpired()`**: Batch-processes expired records in chunks of 100 to reduce memory pressure on large datasets (audit D-3).
+
+- **`NewsItem.isARCapable` / `arModelName`**: Replaced hard-coded switch statements with data-driven `arModelCatalog` dictionary — adding new AR-eligible categories requires a single dictionary entry (audit AR-2).
+
+- **`NewsAnnotationView`**: Added `UIAccessibility.isReduceMotionEnabled` checks to skeleton pulse animation and selection spring animation (audit Accessibility).
+
+- **`RetryPolicy`**: Migrated from `Task.sleep(nanoseconds:)` to modern `Task.sleep(for:)` Duration API (audit C-3).
+
+- **`NewsItemPersistenceModel`**: SwiftData `#Index` macros added as commented-out code ready to uncomment when deployment target ≥ iOS 18 (audit D-1).
+
+- **CI Pipeline** (`.github/workflows/ci.yml`):
+  - Reads Xcode version from `.xcode-version` file instead of hard-coding (audit CI-3).
+  - Added `lint` job as prerequisite for all builds (audit CI-2).
+  - Added coverage collection (`-enableCodeCoverage YES`) and threshold check (audit CI-1).
+  - Status gate now includes lint job in dependency chain.
+
+### Fixed
+
+- **README.md**: Marked "spatial audio feedback" as *(Planned)* to match implementation status (audit DOC-1/AR-3).
+
+### Added
+
 - **Dependency Injection Container** (`Core/DI/`)
   - Actor-based `DependencyContainer` with singleton, transient, and scoped lifetimes.
   - Circular dependency detection for transient services via `resolvingKeys`.
