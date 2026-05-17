@@ -140,7 +140,14 @@
 
     private func checkAuthorization() throws {
       let status = manager.authorizationStatus
-      guard status == .authorizedWhenInUse || status == .authorizedAlways else {
+      let isAuthorized: Bool = {
+        if status == .authorizedWhenInUse { return true }
+        #if os(iOS)
+          if status == .authorizedAlways { return true }
+        #endif
+        return false
+      }()
+      guard isAuthorized else {
         if status == .denied || status == .restricted {
           throw NerveError.location(message: "Location permission denied.")
         }
@@ -202,7 +209,11 @@
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
       let status = manager.authorizationStatus
-      if status == .authorizedWhenInUse || status == .authorizedAlways {
+      var isAuthorized = status == .authorizedWhenInUse
+      #if os(iOS)
+        isAuthorized = isAuthorized || status == .authorizedAlways
+      #endif
+      if isAuthorized {
         manager.startUpdatingLocation()
       }
     }

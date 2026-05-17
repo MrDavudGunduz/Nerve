@@ -22,11 +22,13 @@
 
       let sheet = NewsDetailSheet(cluster: newsAnnotation.cluster)
       sheet.modalPresentationStyle = .pageSheet
-      if let sheetController = sheet.sheetPresentationController {
-        sheetController.detents = [.medium(), .large()]
-        sheetController.prefersGrabberVisible = true
-        sheetController.preferredCornerRadius = 20
-      }
+      #if os(iOS)
+        if let sheetController = sheet.sheetPresentationController {
+          sheetController.detents = [.medium(), .large()]
+          sheetController.prefersGrabberVisible = true
+          sheetController.preferredCornerRadius = 20
+        }
+      #endif
 
       mapView.viewController?.present(sheet, animated: true)
     }
