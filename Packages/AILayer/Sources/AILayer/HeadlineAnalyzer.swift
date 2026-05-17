@@ -48,8 +48,6 @@ public actor HeadlineAnalyzer: AIAnalysisServiceProtocol {
   /// Lazily initialized sentiment tagger — reused across invocations.
   private let sentimentTagger: NLTagger
 
-  /// Maximum number of concurrent analyses in a batch operation.
-  private static let maxConcurrency = 4
 
   // MARK: - Clickbait Patterns
 
@@ -138,17 +136,16 @@ public actor HeadlineAnalyzer: AIAnalysisServiceProtocol {
     )
   }
 
-  /// Analyzes a batch of headlines with bounded concurrency.
+  /// Analyzes a batch of headlines sequentially with order preservation.
   ///
-  /// Uses a `TaskGroup` limited to ``maxConcurrency`` concurrent tasks
-  /// to prevent resource exhaustion on large batches.
+  /// Because `HeadlineAnalyzer` is an actor, all analysis calls serialize on
+  /// the actor's executor regardless of `TaskGroup` usage. A simple sequential
+  /// loop eliminates the scheduling overhead of `TaskGroup` while producing
+  /// identical results in the same order as the input.
   ///
-  /// - Note: Because `HeadlineAnalyzer` is an actor, the child tasks in
-  ///   the group serialize on the actor's executor. The concurrency limit
-  ///   therefore controls *scheduling*, not true parallelism. For sub-1ms
-  ///   per-headline analysis this is sufficient; if analysis latency grows
-  ///   (e.g., CoreML models), consider `nonisolated` analysis functions
-  ///   with per-task tagger instances to unlock real parallelism.
+  /// When analysis latency increases (e.g., switching to CoreML models),
+  /// make ``analyzeHeadline(_:)`` `nonisolated` with per-invocation tagger
+  /// instances and restore `TaskGroup` for true parallelism.
   ///
   /// - Parameter headlines: The headline texts to analyze.
   /// - Returns: An array of ``HeadlineAnalysis`` results in input order.
@@ -156,34 +153,15 @@ public actor HeadlineAnalyzer: AIAnalysisServiceProtocol {
   public func analyzeBatch(_ headlines: [String]) async throws -> [HeadlineAnalysis] {
     guard !headlines.isEmpty else { return [] }
 
-    // Index-tagged results to preserve input ordering after concurrent execution.
-    var results = [HeadlineAnalysis?](repeating: nil, count: headlines.count)
+    var results: [HeadlineAnalysis] = []
+    results.reserveCapacity(headlines.count)
 
-    try await withThrowingTaskGroup(of: (Int, HeadlineAnalysis).self) { group in
-      var launched = 0
-
-      for (index, headline) in headlines.enumerated() {
-        // Throttle: wait for a slot to open before launching more tasks.
-        if launched >= Self.maxConcurrency {
-          if let (idx, analysis) = try await group.next() {
-            results[idx] = analysis
-          }
-        }
-
-        group.addTask { [self] in
-          let analysis = try await self.analyzeHeadline(headline)
-          return (index, analysis)
-        }
-        launched += 1
-      }
-
-      // Collect remaining results.
-      for try await (idx, analysis) in group {
-        results[idx] = analysis
-      }
+    for headline in headlines {
+      let analysis = try await analyzeHeadline(headline)
+      results.append(analysis)
     }
 
-    return results.compactMap { $0 }
+    return results
   }
 
   // MARK: - Sentiment Analysis
