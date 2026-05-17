@@ -126,6 +126,8 @@ public struct NewsItem: Sendable, Codable, Identifiable {
   private static let arModelCatalog: [NewsCategory: String] = [
     .technology: "tech_device",
     .science: "science_model",
+    .health: "health_dna",
+    .environment: "environment_globe",
   ]
 
   /// Whether this news item is eligible for AR/3D model display.
