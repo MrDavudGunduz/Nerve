@@ -118,4 +118,23 @@ public struct SwiftDataStorageService: StorageServiceProtocol {
       )
     }
   }
+
+  /// Deletes all cached news items in a single batch operation.
+  ///
+  /// Performs one fetch + one save via ``PersistenceActor/deleteAll()``
+  /// instead of N individual ``deleteNews(id:)`` calls.
+  ///
+  /// - Returns: The number of items deleted.
+  /// - Throws: ``NerveError/storage(message:context:)`` if the batch delete fails.
+  @discardableResult
+  public func deleteAllNews() async throws -> Int {
+    do {
+      return try await actor.deleteAll()
+    } catch {
+      throw NerveError.storage(
+        message: "deleteAllNews failed: \(error.localizedDescription)",
+        context: ErrorContext(underlyingError: error)
+      )
+    }
+  }
 }

@@ -13,6 +13,15 @@ import SwiftData
 /// `NerveApp` passes ``allModels`` to `Schema(ModelRegistry.allModels)` so
 /// the `ModelContainer` is always consistent with every `@Model` in the project.
 ///
+/// ## Schema Versioning
+///
+/// When the schema evolves, update **both** this registry and the
+/// ``NerveSchemaMigrationPlan``:
+///
+/// 1. Create a new `VersionedSchema` enum (e.g., `NerveSchemaV2`).
+/// 2. Add a `MigrationStage` to ``NerveSchemaMigrationPlan/stages``.
+/// 3. Update ``allModels`` below to include the latest model types.
+///
 /// ## Adding New Models
 ///
 /// When you create a new `@Model`, register it here:
@@ -33,6 +42,8 @@ public enum ModelRegistry {
   /// All persistent `@Model` types included in the SwiftData schema.
   ///
   /// - Important: Every `@Model` defined in `StorageLayer` **must** be listed here.
+  ///   This array must stay in sync with the latest ``NerveSchemaV1/models``
+  ///   (or the most recent `VersionedSchema`).
   public static let allModels: [any PersistentModel.Type] = [
     NewsItemPersistenceModel.self
     // ↓ Register new @Model types below this line

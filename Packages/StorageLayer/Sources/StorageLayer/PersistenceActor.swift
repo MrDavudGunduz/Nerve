@@ -38,7 +38,7 @@ public actor PersistenceActor {
   private let modelContext: ModelContext
 
   /// Logger for persistence diagnostics including corrupt record detection.
-  private let logger = Logger(subsystem: "com.davudgunduz.Nerve", category: "Persistence")
+  private let logger = Logger(subsystem: LogSubsystem.main, category: "Persistence")
 
   /// The time-to-live for cached news items.
   ///
@@ -147,7 +147,9 @@ public actor PersistenceActor {
     if let region {
       // Approximate bounding box: 1° latitude ≈ 111 km.
       let latDelta = region.radiusMeters / 111_000
-      let lonDelta = region.radiusMeters / (111_000 * cos(region.center.latitude * .pi / 180))
+      // Guard against cos(90°) = 0 at polar latitudes — see URLSessionNewsService.
+      let cosLat = max(cos(region.center.latitude * .pi / 180), 0.01)
+      let lonDelta = region.radiusMeters / (111_000 * cosLat)
       let minLat = region.center.latitude - latDelta
       let maxLat = region.center.latitude + latDelta
       let minLon = region.center.longitude - lonDelta
@@ -195,14 +197,35 @@ public actor PersistenceActor {
     if !matches.isEmpty { try modelContext.save() }
   }
 
+  /// Deletes all persisted news items in a single batch operation.
+  ///
+  /// More efficient than calling ``delete(id:)`` in a loop — performs
+  /// one fetch + one save instead of N individual round-trips.
+  ///
+  /// - Returns: The number of records deleted.
+  /// - Throws: If the SwiftData operation fails.
+  @discardableResult
+  public func deleteAll() async throws -> Int {
+    let descriptor = FetchDescriptor<NewsItemPersistenceModel>()
+    let all = try modelContext.fetch(descriptor)
+    guard !all.isEmpty else { return 0 }
+
+    for record in all { modelContext.delete(record) }
+    try modelContext.save()
+
+    logger.info("Batch deleted \(all.count) news items.")
+    return all.count
+  }
+
   // MARK: - Prune
 
-  /// Deletes all cached items whose `cachedAt` timestamp exceeds the 24-hour TTL.
+  /// Deletes all cached items whose `cachedAt` timestamp exceeds the TTL.
   ///
-  /// Fetches expired items in batches of ``pruneBatchSize`` to keep memory
-  /// bounded, but accumulates all deletes and performs a **single**
-  /// `modelContext.save()` at the end — reducing SQLite transaction overhead
-  /// from N round-trips (one per batch) to exactly one.
+  /// Processes expired items in batches of ``pruneBatchSize`` with a
+  /// `modelContext.save()` after **each batch** to ensure deleted records
+  /// are committed before the next fetch. Without per-batch saves,
+  /// SwiftData's in-memory dirty state could return already-deleted
+  /// records in the next `fetch()`, creating an infinite loop.
   ///
   /// Intended to be called on app foreground or background refresh to keep
   /// storage bounded and data fresh.
@@ -212,8 +235,9 @@ public actor PersistenceActor {
     let expiryDate = Date(timeIntervalSinceNow: -cacheTTL)
     var totalPruned = 0
 
-    // Fetch and delete in batches to keep memory footprint bounded,
-    // but defer the save until all batches have been processed.
+    // Fetch and delete in batches to keep memory footprint bounded.
+    // Each batch is saved immediately so the next fetch excludes
+    // already-deleted records — preventing an infinite re-fetch loop.
     while true {
       var descriptor = FetchDescriptor<NewsItemPersistenceModel>(
         predicate: #Predicate { $0.cachedAt < expiryDate }
@@ -226,13 +250,15 @@ public actor PersistenceActor {
       for record in expired { modelContext.delete(record) }
       totalPruned += expired.count
 
+      // Commit deletes before the next batch fetch so SwiftData
+      // doesn't return the same records again.
+      try modelContext.save()
+
       // If we got fewer than a full batch, we're done.
       if expired.count < Self.pruneBatchSize { break }
     }
 
-    // Single atomic save for all accumulated deletes.
     if totalPruned > 0 {
-      try modelContext.save()
       logger.info("Pruned \(totalPruned) expired cache entries.")
     }
   }
