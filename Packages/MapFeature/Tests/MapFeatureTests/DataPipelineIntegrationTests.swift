@@ -38,6 +38,13 @@ struct DataPipelineIntegrationTests {
     }
 
     func pruneExpiredCache() async throws {}
+
+    @discardableResult
+    func deleteAllNews() async throws -> Int {
+      let count = items.count
+      items.removeAll()
+      return count
+    }
   }
 
   /// A news service that returns a fixed set of items.

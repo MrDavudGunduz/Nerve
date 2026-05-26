@@ -11,6 +11,22 @@ import MapKit
 
 // MARK: - NewsAnnotation
 
+// MARK: - @unchecked Sendable Audit
+//
+// Type:       NewsAnnotation
+// Audit Date: 2026-05-18
+// Status:     SAFE — all stored state is immutable
+//
+// Safety Invariants:
+//   ☑ Single stored property `cluster` is `let` (immutable)
+//   ☑ `NewsCluster` is a `Sendable` value type — no shared mutable references
+//   ☑ NSObject/MKAnnotation inheritance prevents automatic Sendable verification
+//   ☑ Computed properties (`coordinate`, `title`, `subtitle`) derive from immutable state
+//
+// If ANY of the following changes occur, re-evaluate Sendable safety:
+//   ☐ A `var` stored property is added
+//   ☐ A mutable reference type is stored
+
 /// A MapKit annotation that bridges a ``Core/NewsCluster`` to the map.
 ///
 /// Each instance represents either a single news item or a merged
@@ -24,11 +40,6 @@ import MapKit
 ///   forAnnotationViewWithReuseIdentifier: NewsAnnotation.clusterReuseID
 /// )
 /// ```
-// `@unchecked Sendable`: NSObject/MKAnnotation inheritance prevents the compiler
-// from verifying Sendable automatically. Safety is guaranteed manually:
-//   • All stored state is immutable (`let cluster: NewsCluster`).
-//   • `NewsCluster` is a `Sendable` value type — no shared mutable references.
-// If mutable stored properties are added in the future, add explicit synchronisation.
 public final class NewsAnnotation: NSObject, MKAnnotation, @unchecked Sendable {
 
   // MARK: - Reuse Identifiers

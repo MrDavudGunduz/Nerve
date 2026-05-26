@@ -56,7 +56,7 @@ public enum LocationServiceFactory {
 struct NullLocationService: LocationServiceProtocol, Sendable {
 
   private let logger = Logger(
-    subsystem: "com.davudgunduz.Nerve",
+    subsystem: LogSubsystem.mapFeature,
     category: "NullLocationService"
   )
 

@@ -70,6 +70,23 @@ struct BoundingBox: Sendable, Hashable {
 
 // MARK: - QuadTree
 
+// MARK: - @unchecked Sendable Audit
+//
+// Type:       QuadTree<Element>
+// Audit Date: 2026-05-18
+// Status:     SAFE — all access serialized by AnnotationClusterer actor
+//
+// Safety Invariants:
+//   ☑ Created inside AnnotationClusterer actor-isolated methods only
+//   ☑ No reference escapes the actor boundary
+//   ☑ Rebuilt per clustering pass — never shared across concurrent contexts
+//   ☑ All stored state is mutable (entries, children) but access is serialized
+//
+// If ANY of the following changes occur, re-evaluate Sendable safety:
+//   ☐ QuadTree is passed to a detached Task
+//   ☐ QuadTree reference is stored in a Sendable property outside the actor
+//   ☐ A public API is added that returns or accepts a QuadTree
+
 /// A spatial index that partitions 2D geographic space into quadrants
 /// for efficient point queries and range searches.
 ///

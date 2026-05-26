@@ -69,6 +69,13 @@
       showsHorizontalScrollIndicator = false
       showsVerticalScrollIndicator = false
       contentInset = UIEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
+
+      // ── Accessibility ──
+      // Group the chip bar as a single semantic container so VoiceOver
+      // announces it as "Category filter" before enumerating individual chips.
+      accessibilityIdentifier = "categoryChipBar"
+      accessibilityLabel = "Category filter"
+
       buildChips()
     }
 
@@ -137,6 +144,12 @@
       btn.layer.shadowRadius = 3
       btn.layer.shadowOffset = CGSize(width: 0, height: 1)
       btn.addTarget(self, action: #selector(chipTapped(_:)), for: .touchUpInside)
+
+      // ── Accessibility ──
+      btn.accessibilityIdentifier = tag == -1 ? "chip-all" : "chip-\(title.lowercased())"
+      btn.accessibilityLabel = tag == -1 ? "All categories" : "\(title) category filter"
+      btn.accessibilityHint = "Double tap to toggle this filter"
+
       return btn
     }
 
@@ -183,6 +196,7 @@
             ? UIColor.label.withAlphaComponent(0.85)
             : UIColor.systemGray.withAlphaComponent(0.70)
           btn.configuration = config
+          btn.accessibilityTraits = isAll ? [.button, .selected] : .button
         } else {
           let category = NewsCategory.allCases[btn.tag]
           let isActive = selected.contains(category)
@@ -190,6 +204,7 @@
           var config = btn.configuration
           config?.baseBackgroundColor = isActive ? base : base.withAlphaComponent(0.40)
           btn.configuration = config
+          btn.accessibilityTraits = isActive ? [.button, .selected] : .button
         }
       }
     }

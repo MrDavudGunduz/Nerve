@@ -48,7 +48,7 @@
 
     private let manager: CLLocationManager
     private let delegate: LocationDelegate
-    private let logger = Logger(subsystem: "com.davudgunduz.Nerve", category: "Location")
+    private let logger = Logger(subsystem: LogSubsystem.mapFeature, category: "Location")
 
     /// The most recently received location fix, if any.
     public private(set) var lastKnownLocation: GeoCoordinate?

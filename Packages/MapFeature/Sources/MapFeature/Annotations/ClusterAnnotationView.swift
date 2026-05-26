@@ -136,10 +136,19 @@
     // MARK: - Skeleton
 
     /// Replaces real content with a pulsing grey placeholder while data loads.
+    ///
+    /// Respects the user's Reduce Motion accessibility preference.
+    /// When Reduce Motion is enabled, the skeleton is shown with a static
+    /// reduced opacity instead of a pulsing animation.
     public func showSkeleton() {
       countLabel.text = nil
       backgroundColor = .systemGray4
       layer.borderColor = UIColor.clear.cgColor
+
+      guard !UIAccessibility.isReduceMotionEnabled else {
+        layer.opacity = 0.6
+        return
+      }
 
       let pulse = CABasicAnimation(keyPath: "opacity")
       pulse.fromValue = 1.0
@@ -154,12 +163,21 @@
     /// Restores the normal appearance after data has loaded.
     public func hideSkeleton() {
       layer.removeAnimation(forKey: "skeletonPulse")
+      layer.opacity = 1.0
     }
 
     // MARK: - Animation
 
     /// Plays a spring scale animation when the cluster appears or updates.
+    ///
+    /// Respects the user's Reduce Motion accessibility preference.
     public func animateAppearance() {
+      guard !UIAccessibility.isReduceMotionEnabled else {
+        transform = .identity
+        alpha = 1.0
+        return
+      }
+
       transform = CGAffineTransform(scaleX: 0.3, y: 0.3)
       alpha = 0.0
 
@@ -175,7 +193,16 @@
     }
 
     /// Plays a collapse animation before removal.
+    ///
+    /// Respects the user's Reduce Motion accessibility preference.
     public func animateDisappearance(completion: @escaping () -> Void) {
+      guard !UIAccessibility.isReduceMotionEnabled else {
+        transform = CGAffineTransform(scaleX: 0.1, y: 0.1)
+        alpha = 0.0
+        completion()
+        return
+      }
+
       UIView.animate(
         withDuration: 0.25, delay: 0,
         options: [.curveEaseIn],

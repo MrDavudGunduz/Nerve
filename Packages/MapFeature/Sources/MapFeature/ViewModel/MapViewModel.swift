@@ -114,7 +114,7 @@ public final class MapViewModel {
   /// Cancelled on reset or when a new load supersedes the current analysis.
   var analyzeTask: Task<Void, Never>?
 
-  let logger = Logger(subsystem: "com.davudgunduz.Nerve", category: "MapViewModel")
+  let logger = Logger(subsystem: LogSubsystem.mapFeature, category: "MapViewModel")
 
   // MARK: - Dependencies
 

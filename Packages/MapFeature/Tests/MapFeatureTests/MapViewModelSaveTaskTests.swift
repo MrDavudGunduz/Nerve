@@ -168,4 +168,7 @@ private actor SlowSpyStorageService: StorageServiceProtocol {
   func fetchNews(in region: GeoRegion?, limit: Int?, offset: Int?) async throws -> [NewsItem] { [] }
   func deleteNews(id: String) async throws {}
   func pruneExpiredCache() async throws {}
+
+  @discardableResult
+  func deleteAllNews() async throws -> Int { 0 }
 }

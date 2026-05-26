@@ -68,6 +68,12 @@
 
       let tap = UITapGestureRecognizer(target: self, action: #selector(dismiss))
       addGestureRecognizer(tap)
+
+      // ── Accessibility ──
+      isAccessibilityElement = true
+      accessibilityTraits = [.staticText, .button]
+      accessibilityIdentifier = "errorBanner"
+      accessibilityHint = "Double tap to dismiss"
     }
 
     // MARK: - Public API
@@ -81,8 +87,14 @@
     /// - Parameter message: The error text to display (max two lines).
     func show(message: String) {
       label.text = message
+      accessibilityLabel = "Error: \(message)"
       dismissTimer?.invalidate()
       UIView.animate(withDuration: 0.25) { self.alpha = 1 }
+
+      // Post a VoiceOver announcement so screen reader users are notified
+      // even when focus is elsewhere on the map.
+      UIAccessibility.post(notification: .announcement, argument: "Error: \(message)")
+
       // Block-based timer avoids a retain cycle: the previous target-action
       // form held `self` strongly, preventing deallocation if the banner was
       // removed from the view hierarchy before the timer fired.
