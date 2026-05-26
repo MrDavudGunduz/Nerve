@@ -29,7 +29,7 @@ import OSLog
 public struct PlaceholderImageService: ImageServiceProtocol {
 
   private static let logger = Logger(
-    subsystem: "com.davudgunduz.Nerve.NetworkLayer",
+    subsystem: LogSubsystem.networkLayer,
     category: "PlaceholderImageService"
   )
 

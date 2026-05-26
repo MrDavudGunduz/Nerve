@@ -56,7 +56,7 @@ public struct URLSessionNewsService: NewsServiceProtocol {
   private let decoder: JSONDecoder
 
   private static let logger = Logger(
-    subsystem: "com.davudgunduz.Nerve.NetworkLayer",
+    subsystem: LogSubsystem.networkLayer,
     category: "URLSessionNewsService"
   )
 
@@ -168,7 +168,11 @@ public struct URLSessionNewsService: NewsServiceProtocol {
   private func buildFetchURL(for region: GeoRegion) throws -> URL {
     // Approximate bounding box: 1° latitude ≈ 111 km.
     let latDelta = region.radiusMeters / 111_000
-    let lonDelta = region.radiusMeters / (111_000 * cos(region.center.latitude * .pi / 180))
+    // Guard against cos(90°) = 0 at polar latitudes, which would produce
+    // lonDelta = Infinity. The floor of 0.01 caps the maximum bounding box
+    // to ±(radius / 1_110) degrees — still a valid approximation.
+    let cosLat = max(cos(region.center.latitude * .pi / 180), 0.01)
+    let lonDelta = region.radiusMeters / (111_000 * cosLat)
 
     guard var components = URLComponents(
       url: configuration.baseURL.appendingPathComponent("news"),
@@ -324,13 +328,21 @@ struct NewsItemDTO: Decodable, Sendable {
   let publishedAt: Date
   let imageUrl: String?
 
+  /// Safe fallback coordinate for invalid API data.
+  ///
+  /// Defined as a `static let` to avoid force unwrap at the call site.
+  /// `GeoCoordinate(latitude: 0, longitude: 0)` is always valid (Null Island),
+  /// so the `!` is structurally safe — but a static constant is clearer intent.
+  // swiftlint:disable:next force_unwrapping
+  private static let fallbackCoordinate = GeoCoordinate(latitude: 0, longitude: 0)!
+
   /// Converts this DTO to the canonical domain model.
   ///
   /// Invalid coordinates or unknown categories fall back to safe defaults
   /// rather than crashing — the API contract may evolve independently.
   func toDomainModel() -> NewsItem {
     let coordinate = GeoCoordinate(latitude: latitude, longitude: longitude)
-      ?? GeoCoordinate(latitude: 0, longitude: 0)!
+      ?? Self.fallbackCoordinate
 
     let newsCategory = NewsCategory(rawValue: category) ?? .other
 

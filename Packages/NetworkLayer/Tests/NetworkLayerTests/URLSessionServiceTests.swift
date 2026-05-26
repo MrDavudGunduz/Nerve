@@ -203,6 +203,46 @@ struct NewsItemDTOTests {
     #expect(item.articleURL == nil)
     #expect(item.imageURL == nil)
   }
+
+  @Test("DTO with invalid URL strings produces nil URL properties")
+  func invalidURLStrings() {
+    let dto = NewsItemDTO(
+      id: "test-5",
+      headline: "Test",
+      summary: "Summary",
+      source: "Source",
+      articleUrl: "",  // Empty string → URL(string:) returns nil
+      category: "politics",
+      latitude: 41.0,
+      longitude: 29.0,
+      publishedAt: Date(),
+      imageUrl: ""  // Empty string → URL(string:) returns nil
+    )
+
+    let item = dto.toDomainModel()
+    #expect(item.articleURL == nil)
+    #expect(item.imageURL == nil)
+  }
+
+  @Test("DTO always produces nil analysis on conversion")
+  func analysisAlwaysNil() {
+    let dto = NewsItemDTO(
+      id: "test-6",
+      headline: "Headline",
+      summary: "Summary",
+      source: "Source",
+      articleUrl: nil,
+      category: "technology",
+      latitude: 41.0,
+      longitude: 29.0,
+      publishedAt: Date(),
+      imageUrl: nil
+    )
+
+    // Analysis is always nil at the DTO layer — enriched later by AILayer.
+    let item = dto.toDomainModel()
+    #expect(item.analysis == nil)
+  }
 }
 
 // MARK: - RetryPolicy Tests

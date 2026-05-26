@@ -29,7 +29,7 @@ import OSLog
 public struct PlaceholderNewsService: NewsServiceProtocol {
 
   private static let logger = Logger(
-    subsystem: "com.davudgunduz.Nerve.NetworkLayer",
+    subsystem: LogSubsystem.networkLayer,
     category: "PlaceholderNewsService"
   )
 

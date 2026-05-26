@@ -51,11 +51,15 @@ public actor URLSessionImageService: ImageServiceProtocol {
   private let memoryCache: NSCache<NSString, NSData>
   private let diskCacheDirectory: URL
 
+  /// Maximum disk cache size in bytes. When exceeded, least-recently-accessed
+  /// files are evicted until usage drops below the limit.
+  private let maxDiskCacheBytes: Int
+
   /// URLs currently being downloaded — prevents duplicate concurrent requests.
   private var inflightRequests: [URL: Task<Data, any Error>] = [:]
 
   private static let logger = Logger(
-    subsystem: "com.davudgunduz.Nerve.NetworkLayer",
+    subsystem: LogSubsystem.networkLayer,
     category: "URLSessionImageService"
   )
 
@@ -65,12 +69,16 @@ public actor URLSessionImageService: ImageServiceProtocol {
   ///
   /// - Parameters:
   ///   - cacheSizeMB: Maximum memory cache size in megabytes (default: 100).
+  ///   - diskCacheSizeMB: Maximum disk cache size in megabytes (default: 200).
+  ///     When exceeded, least-recently-accessed files are evicted.
   ///   - session: Optional custom URLSession (default: shared).
   public init(
     cacheSizeMB: Int = 100,
+    diskCacheSizeMB: Int = 200,
     session: URLSession = .shared
   ) {
     self.session = session
+    self.maxDiskCacheBytes = diskCacheSizeMB * 1_024 * 1_024
 
     // ── L1: Memory Cache ──
     let cache = NSCache<NSString, NSData>()
@@ -117,6 +125,10 @@ public actor URLSessionImageService: ImageServiceProtocol {
     if let diskData = try? Data(contentsOf: diskURL) {
       // Promote to L1.
       memoryCache.setObject(diskData as NSData, forKey: cacheKey as NSString, cost: diskData.count)
+      // Touch the file to update access date for LRU eviction.
+      try? FileManager.default.setAttributes(
+        [.modificationDate: Date()], ofItemAtPath: diskURL.path
+      )
       Self.logger.debug("L2 cache hit: \(url.lastPathComponent)")
       return diskData
     }
@@ -131,7 +143,7 @@ public actor URLSessionImageService: ImageServiceProtocol {
     // Register the task BEFORE awaiting its value to close the actor
     // reentrancy gap. Without this, a second call arriving during the
     // `await downloadTask.value` suspension could bypass the inflight
-    // check (line 125) and start a duplicate download.
+    // check (line above) and start a duplicate download.
     let downloadTask = Task<Data, any Error> { [session] in
       let data = try await RetryPolicy.execute(
         maxAttempts: 2,
@@ -177,6 +189,10 @@ public actor URLSessionImageService: ImageServiceProtocol {
       try? data.write(to: diskURL, options: .atomic)
 
       inflightRequests[url] = nil
+
+      // Evict stale disk entries if cache exceeds size limit.
+      evictStaleDiskEntries()
+
       return data
 
     } catch {
@@ -204,6 +220,54 @@ public actor URLSessionImageService: ImageServiceProtocol {
     } catch {
       Self.logger.warning("Failed to clear disk cache: \(error.localizedDescription)")
     }
+  }
+
+  // MARK: - Disk Cache Eviction
+
+  /// Evicts least-recently-modified files when disk usage exceeds ``maxDiskCacheBytes``.
+  ///
+  /// Uses file modification dates as a proxy for access recency (updated on L2 hits).
+  /// Evicts the oldest files first until total size drops below the limit.
+  private func evictStaleDiskEntries() {
+    let fm = FileManager.default
+    guard
+      let files = try? fm.contentsOfDirectory(
+        at: diskCacheDirectory,
+        includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey]
+      )
+    else { return }
+
+    // Compute total disk usage and collect file metadata.
+    var entries: [(url: URL, size: Int, modified: Date)] = []
+    var totalSize = 0
+
+    for file in files {
+      guard
+        let values = try? file.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]),
+        let size = values.fileSize,
+        let modified = values.contentModificationDate
+      else { continue }
+
+      entries.append((url: file, size: size, modified: modified))
+      totalSize += size
+    }
+
+    guard totalSize > maxDiskCacheBytes else { return }
+
+    // Sort by modification date ascending — oldest first.
+    entries.sort { $0.modified < $1.modified }
+
+    var evictedCount = 0
+    for entry in entries {
+      guard totalSize > maxDiskCacheBytes else { break }
+      try? fm.removeItem(at: entry.url)
+      totalSize -= entry.size
+      evictedCount += 1
+    }
+
+    Self.logger.info(
+      "Disk cache eviction: removed \(evictedCount) files, \(totalSize / 1_024 / 1_024)MB remaining."
+    )
   }
 
   // MARK: - Cache Key
