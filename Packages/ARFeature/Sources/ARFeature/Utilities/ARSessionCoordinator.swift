@@ -8,6 +8,7 @@
 #if canImport(ARKit) && os(iOS)
 
   import ARKit
+  import Core
   import Foundation
   import OSLog
 
@@ -39,7 +40,7 @@
     private weak var viewModel: ARNewsViewModel?
 
     private static let logger = Logger(
-      subsystem: "com.davudgunduz.Nerve.ARFeature",
+      subsystem: LogSubsystem.arFeature,
       category: "ARSessionCoordinator"
     )
 

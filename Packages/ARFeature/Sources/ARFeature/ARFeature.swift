@@ -18,6 +18,8 @@ import Core
 /// On **visionOS**, provides:
 /// - **Volumetric windows** — detach 3D news models into the user's space.
 /// - **Immersive spaces** — navigate a spatial 3D news map.
+/// - **Spatial audio** — 3D-positioned audio cues for interactions.
+/// - **Scene transitions** — smooth orchestration between 2D ↔ Volumetric ↔ Immersive.
 ///
 /// On **macOS** and non-AR devices, gracefully degrades to a
 /// SceneKit-based 3D model viewer with orbit camera controls.
@@ -29,8 +31,11 @@ import Core
 /// - ``ARNewsView`` — The primary SwiftUI entry point; adapts to device capabilities.
 /// - ``ARNewsViewController`` — UIKit-hosted wrapper for UINavigationController integration.
 /// - ``ModelViewerView`` — SceneKit fallback for macOS / Simulator.
-/// - ``VolumetricNewsView`` — visionOS volumetric window content.
-/// - ``SpatialMapView`` — visionOS immersive space content.
+/// - ``VolumetricNewsView`` — visionOS volumetric window content with spatial audio
+///   and entity lifecycle management.
+/// - ``SpatialMapView`` — visionOS immersive space content with topographical surface,
+///   floating annotation tags, and gaze + pinch interaction.
+/// - ``SpatialSceneToolbar`` — Floating toolbar for scene mode transitions (visionOS).
 /// - ``AROverlayCard`` — Floating headline + credibility badge overlay.
 /// - ``ARCoachingOverlay`` — Guided surface detection overlay.
 /// - ``ARTrackingBanner`` — Compact tracking quality indicator.
@@ -45,6 +50,8 @@ import Core
 /// - ``EntityGestureHandlers`` — Reusable RealityKit gesture logic with haptics.
 /// - ``EntityAnimations`` — Spring-based entrance, exit, and pulse animations.
 /// - ``ARHapticEngine`` — Core Haptics feedback for AR interactions (iOS).
+/// - ``SpatialAudioEngine`` — AVAudioEngine-based 3D audio for visionOS.
+/// - ``SpatialTransitionManager`` — Orchestrates 2D ↔ Volumetric ↔ Immersive transitions.
 /// - ``ARSessionCoordinator`` — ARKit session delegate bridge (iOS).
 /// - ``EntityLifecycleManager`` — VRAM-safe entity tracking and teardown.
 /// - ``ARTrackingQuality`` — Tracking state value types.
@@ -53,11 +60,11 @@ import Core
 /// ## AR-Eligible Categories
 ///
 /// | Category       | USDZ Model         |
-/// |----------------|--------------------|
-/// | `.technology`  | `tech_device`      |
-/// | `.science`     | `science_model`    |
-/// | `.health`      | `health_dna`       |
-/// | `.environment` | `environment_globe`|
+/// |----------------|---------------------|
+/// | `.technology`  | `tech_device`       |
+/// | `.science`     | `science_model`     |
+/// | `.health`      | `health_dna`        |
+/// | `.environment` | `environment_globe` |
 ///
 /// ## Integration
 ///
@@ -71,16 +78,19 @@ import Core
 /// navigationController?.pushViewController(arVC, animated: true)
 ///
 /// // visionOS volumetric window:
-/// WindowGroup(id: "news-3d-viewer") {
+/// WindowGroup(id: SpatialTransitionManager.volumetricWindowID) {
 ///   VolumetricNewsView()
 /// }
 /// .windowStyle(.volumetric)
 ///
 /// // visionOS immersive space:
-/// ImmersiveSpace(id: "spatial-map") {
+/// ImmersiveSpace(id: SpatialTransitionManager.immersiveSpaceID) {
 ///   SpatialMapView()
 /// }
 /// .immersionStyle(selection: .constant(.mixed), in: .mixed)
+///
+/// // Scene transitions (visionOS):
+/// SpatialSceneToolbar(transitionManager: transitionManager)
 /// ```
 public enum ARFeature {
 

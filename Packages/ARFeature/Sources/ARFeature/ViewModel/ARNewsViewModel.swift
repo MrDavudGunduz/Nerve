@@ -147,7 +147,7 @@ public final class ARNewsViewModel {
   private var surfaceAdvanceTask: Task<Void, Never>?
 
   private static let logger = Logger(
-    subsystem: "com.davudgunduz.Nerve.ARFeature",
+    subsystem: LogSubsystem.arFeature,
     category: "ARNewsViewModel"
   )
 

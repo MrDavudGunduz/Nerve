@@ -81,7 +81,7 @@ public struct ModelViewerView: View {
 enum ModelViewerLog {
 
   static let logger = Logger(
-    subsystem: "com.davudgunduz.Nerve.ARFeature",
+    subsystem: LogSubsystem.arFeature,
     category: "ModelViewerView"
   )
 }

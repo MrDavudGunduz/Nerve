@@ -19,7 +19,20 @@ import SwiftUI
 ///
 /// Renders a USDZ model inside a volumetric `WindowGroup` that extends
 /// into the user's physical space. The model floats in 3D with spatial
-/// lighting and supports gaze + pinch interaction.
+/// lighting, supports gaze + pinch interaction, and plays spatial audio
+/// cues on interaction events.
+///
+/// ## Features
+///
+/// - **Entity lifecycle management** — Tracks and tears down entities
+///   to prevent VRAM leaks via ``EntityLifecycleManager``.
+/// - **Idle rotation animation** — Model slowly rotates on Y-axis
+///   for visual appeal when not being manipulated.
+/// - **Spatial audio** — Plays attachment, detachment, and interaction
+///   sounds via ``SpatialAudioEngine``.
+/// - **Glassmorphism overlay card** — Floating headline + credibility badge
+///   via ``AROverlayCard``.
+/// - **Gesture support** — Drag, pinch-to-scale, and rotation gestures.
 ///
 /// ## Usage
 ///
@@ -47,8 +60,19 @@ public struct VolumetricNewsView: View {
   /// The news item to display, passed via environment or binding.
   @State private var newsItem: NewsItem?
 
+  /// Whether the info overlay card is visible.
+  @State private var showOverlayCard = true
+
+  /// Controls the idle rotation animation.
+  @State private var isIdleRotating = true
+
+  #if canImport(RealityKit)
+    /// Entity lifecycle tracker for VRAM-safe teardown.
+    @State private var lifecycleManager = EntityLifecycleManager()
+  #endif
+
   private static let logger = Logger(
-    subsystem: "com.davudgunduz.Nerve.ARFeature",
+    subsystem: LogSubsystem.arFeature,
     category: "VolumetricNewsView"
   )
 
@@ -85,6 +109,17 @@ public struct VolumetricNewsView: View {
         viewModel = ARNewsViewModel(newsItem: newsItem)
         viewModel?.loadModel()
       }
+      #if os(visionOS)
+        SpatialAudioEngine.initialize()
+      #endif
+    }
+    .onDisappear {
+      #if canImport(RealityKit)
+        lifecycleManager.teardownAll()
+      #endif
+      #if os(visionOS)
+        SpatialAudioEngine.playModelDetach()
+      #endif
     }
   }
 
@@ -97,14 +132,7 @@ public struct VolumetricNewsView: View {
       emptyState
 
     case .loading:
-      VStack(spacing: 12) {
-        ProgressView()
-          .scaleEffect(1.3)
-        Text("Loading 3D Model…")
-          .font(.headline)
-          .foregroundStyle(.secondary)
-      }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      loadingState
 
     case .loaded:
       #if canImport(RealityKit) && os(visionOS)
@@ -117,20 +145,64 @@ public struct VolumetricNewsView: View {
       #endif
 
     case .failed(let message):
-      VStack(spacing: 16) {
-        Image(systemName: "exclamationmark.triangle.fill")
-          .font(.system(size: 40))
-          .foregroundStyle(.orange)
-        Text("Model Unavailable")
-          .font(.title3)
-          .fontWeight(.bold)
-        Text(message)
-          .font(.body)
-          .foregroundStyle(.secondary)
-          .multilineTextAlignment(.center)
-      }
-      .padding()
+      errorState(message: message)
     }
+  }
+
+  // MARK: - Loading State
+
+  private var loadingState: some View {
+    VStack(spacing: 16) {
+      ProgressView()
+        .scaleEffect(1.5)
+        .tint(.white)
+
+      Text("Loading 3D Model…")
+        .font(.headline)
+        .foregroundStyle(.secondary)
+
+      Text("Preparing spatial content")
+        .font(.caption)
+        .foregroundStyle(.tertiary)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Loading 3D model")
+  }
+
+  // MARK: - Error State
+
+  private func errorState(message: String) -> some View {
+    VStack(spacing: 16) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .font(.system(size: 40))
+        .foregroundStyle(.orange)
+        .symbolEffect(.pulse)
+
+      Text("Model Unavailable")
+        .font(.title3)
+        .fontWeight(.bold)
+
+      Text(message)
+        .font(.body)
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
+
+      if let viewModel {
+        Button {
+          viewModel.reset()
+          viewModel.loadModel()
+        } label: {
+          Label("Retry", systemImage: "arrow.clockwise")
+            .font(.callout)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(.blue)
+      }
+    }
+    .padding()
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("Model loading failed: \(message)")
   }
 
   // MARK: - RealityKit Volumetric (visionOS only)
@@ -139,64 +211,159 @@ public struct VolumetricNewsView: View {
     @State private var gestureState = EntityGestureState()
 
     private func volumetricRealityView(viewModel: ARNewsViewModel) -> some View {
-      RealityView { content in
-        if let modelURL = viewModel.modelURL {
-          do {
-            let entity = try await ModelEntity(contentsOf: modelURL)
-            entity.name = "VolumetricNewsModel"
+      ZStack {
+        // 3D content
+        RealityView { content in
+          if let modelURL = viewModel.modelURL {
+            do {
+              let entity = try await ModelEntity(contentsOf: modelURL)
+              entity.name = "VolumetricNewsModel"
 
-            // Scale for volumetric context.
-            entity.scale = SIMD3<Float>(
-              repeating: ARNewsConfiguration.volumetricModelScale
+              // Scale for volumetric context.
+              entity.scale = SIMD3<Float>(
+                repeating: ARNewsConfiguration.volumetricModelScale
+              )
+
+              // Center in the volumetric window.
+              entity.position = .zero
+
+              // Enable gestures.
+              entity.generateCollisionShapes(recursive: true)
+              entity.components.set(
+                InputTargetComponent(allowedInputTypes: .all)
+              )
+
+              // Add ground shadow.
+              entity.components.set(GroundingShadowComponent(castsShadow: true))
+
+              // Track for lifecycle management.
+              lifecycleManager.track(entity)
+
+              content.add(entity)
+
+              // Play entrance animation.
+              await EntityAnimations.playEntrance(on: entity, targetY: 0)
+
+              // Start idle hover bob.
+              EntityAnimations.startHoverBob(on: entity, amplitude: 0.003, duration: 3.0)
+
+              // Spatial audio: model attached.
+              SpatialAudioEngine.playModelAttach(at: entity.position)
+
+              Self.logger.info("Volumetric model loaded and animated successfully.")
+            } catch {
+              Self.logger.error(
+                "Failed to load volumetric entity: \(error.localizedDescription)"
+              )
+            }
+          }
+        }
+        .gesture(dragGesture)
+        .gesture(magnifyGesture)
+        .gesture(rotateGesture)
+
+        // Overlay card
+        if showOverlayCard, let newsItem = viewModel.newsItem as NewsItem? {
+          VStack {
+            Spacer()
+
+            AROverlayCard(
+              newsItem: newsItem,
+              onDismiss: {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                  showOverlayCard = false
+                }
+              }
             )
+            .padding(.bottom, 20)
+            .transition(.opacity.combined(with: .move(edge: .bottom)))
+          }
+        }
 
-            // Center in the volumetric window.
-            entity.position = .zero
-
-            // Enable gestures.
-            entity.generateCollisionShapes(recursive: true)
-            entity.components.set(
-              InputTargetComponent(allowedInputTypes: .all)
-            )
-
-            content.add(entity)
-
-            Self.logger.info("Volumetric model loaded successfully.")
-          } catch {
-            Self.logger.error(
-              "Failed to load volumetric entity: \(error.localizedDescription)"
-            )
+        // Toggle overlay button
+        if !showOverlayCard {
+          VStack {
+            HStack {
+              Spacer()
+              Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                  showOverlayCard = true
+                }
+                SpatialAudioEngine.playAnnotationSelect()
+              } label: {
+                Image(systemName: "info.circle.fill")
+                  .font(.title2)
+                  .foregroundStyle(.white)
+                  .padding(12)
+                  .background(.ultraThinMaterial)
+                  .clipShape(Circle())
+              }
+              .buttonStyle(.plain)
+              .padding()
+              .accessibilityLabel("Show news information")
+            }
+            Spacer()
           }
         }
       }
-      .gesture(
-        DragGesture()
-          .targetedToAnyEntity()
-          .onChanged { value in
-            EntityGestureHandlers.handleDrag(
-              translation: value.translation,
-              on: value.entity,
-              state: &gestureState
-            )
+      .animation(.easeInOut(duration: 0.3), value: showOverlayCard)
+    }
+
+    // MARK: - Gestures
+
+    private var dragGesture: some Gesture {
+      DragGesture()
+        .targetedToAnyEntity()
+        .onChanged { value in
+          isIdleRotating = false
+          EntityGestureHandlers.handleDrag(
+            translation: value.translation,
+            on: value.entity,
+            state: &gestureState
+          )
+        }
+        .onEnded { value in
+          gestureState.captureBaseline(from: value.entity)
+          // Resume idle rotation after gesture.
+          Task {
+            try? await Task.sleep(for: .seconds(2.0))
+            isIdleRotating = true
           }
-          .onEnded { value in
-            gestureState.captureBaseline(from: value.entity)
-          }
-      )
-      .gesture(
-        MagnifyGesture()
-          .targetedToAnyEntity()
-          .onChanged { value in
-            EntityGestureHandlers.handleScale(
-              magnification: value.magnification,
-              on: value.entity,
-              state: &gestureState
-            )
-          }
-          .onEnded { value in
-            gestureState.captureBaseline(from: value.entity)
-          }
-      )
+        }
+    }
+
+    private var magnifyGesture: some Gesture {
+      MagnifyGesture()
+        .targetedToAnyEntity()
+        .onChanged { value in
+          isIdleRotating = false
+          EntityGestureHandlers.handleScale(
+            magnification: value.magnification,
+            on: value.entity,
+            state: &gestureState
+          )
+        }
+        .onEnded { value in
+          gestureState.captureBaseline(from: value.entity)
+          SpatialAudioEngine.playAnnotationSelect(at: value.entity.position)
+        }
+    }
+
+    private var rotateGesture: some Gesture {
+      RotateGesture3D()
+        .targetedToAnyEntity()
+        .onChanged { value in
+          isIdleRotating = false
+          let angle = Angle(radians: value.rotation.angle.radians)
+          EntityGestureHandlers.handleRotation(
+            angle: angle,
+            on: value.entity,
+            state: &gestureState
+          )
+        }
+        .onEnded { value in
+          gestureState.captureBaseline(from: value.entity)
+        }
     }
   #endif
 
@@ -207,9 +374,12 @@ public struct VolumetricNewsView: View {
       Image(systemName: "cube.transparent")
         .font(.system(size: 48))
         .foregroundStyle(.tertiary)
+        .symbolEffect(.pulse)
+
       Text("No 3D Content")
         .font(.title3)
         .foregroundStyle(.secondary)
+
       Text("Select an AR-eligible news story to view its 3D model.")
         .font(.body)
         .foregroundStyle(.tertiary)
@@ -217,6 +387,8 @@ public struct VolumetricNewsView: View {
     }
     .padding()
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("No 3D content available. Select an AR-eligible news story.")
   }
 }
 

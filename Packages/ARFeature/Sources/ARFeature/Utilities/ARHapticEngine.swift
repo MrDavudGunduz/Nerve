@@ -6,6 +6,7 @@
 //
 
 #if os(iOS)
+  import Core
   import CoreHaptics
   import OSLog
   import UIKit
@@ -37,7 +38,7 @@
     // MARK: - Logging
 
     private static let logger = Logger(
-      subsystem: "com.davudgunduz.Nerve.ARFeature",
+      subsystem: LogSubsystem.arFeature,
       category: "ARHapticEngine"
     )
 

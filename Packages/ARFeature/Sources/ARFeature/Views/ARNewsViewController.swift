@@ -58,7 +58,7 @@
     // MARK: - Logging
 
     private nonisolated(unsafe) static let logger = Logger(
-      subsystem: "com.davudgunduz.Nerve.ARFeature",
+      subsystem: LogSubsystem.arFeature,
       category: "ARNewsViewController"
     )
 

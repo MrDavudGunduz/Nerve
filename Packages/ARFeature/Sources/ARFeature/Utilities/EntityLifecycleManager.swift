@@ -7,6 +7,7 @@
 
 #if canImport(RealityKit)
 
+  import Core
   import Foundation
   import OSLog
   import RealityKit
@@ -57,7 +58,7 @@
     private var trackedEntities: [String: Entity] = [:]
 
     private static let logger = Logger(
-      subsystem: "com.davudgunduz.Nerve.ARFeature",
+      subsystem: LogSubsystem.arFeature,
       category: "EntityLifecycleManager"
     )
 

@@ -118,7 +118,7 @@ public struct ARNewsView: View {
 enum ARNewsViewLog {
 
   static let logger = Logger(
-    subsystem: "com.davudgunduz.Nerve.ARFeature",
+    subsystem: LogSubsystem.arFeature,
     category: "ARNewsView"
   )
 }

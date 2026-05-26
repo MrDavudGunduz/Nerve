@@ -32,7 +32,7 @@ public actor ARService: ARServiceProtocol {
   // MARK: - Logging
 
   private static let logger = Logger(
-    subsystem: "com.davudgunduz.Nerve.ARFeature",
+    subsystem: LogSubsystem.arFeature,
     category: "ARService"
   )
 

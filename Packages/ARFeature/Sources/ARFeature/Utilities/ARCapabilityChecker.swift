@@ -5,6 +5,7 @@
 //  Created by Davud Gunduz on 01.05.2026.
 //
 
+import Core
 import Foundation
 import OSLog
 
@@ -41,7 +42,7 @@ public struct ARCapabilityChecker: Sendable {
   // MARK: - Logging
 
   private static let logger = Logger(
-    subsystem: "com.davudgunduz.Nerve.ARFeature",
+    subsystem: LogSubsystem.arFeature,
     category: "ARCapabilityChecker"
   )
 

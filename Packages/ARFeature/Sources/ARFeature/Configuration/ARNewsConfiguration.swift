@@ -140,4 +140,44 @@ public struct ARNewsConfiguration: Sendable {
 
   /// Duration (seconds) of insufficient tracking before showing a warning.
   public static let trackingWarningDelay: TimeInterval = 3.0
+
+  // MARK: - Spatial Map (Immersive Space)
+
+  /// Scale factor to convert geographic degrees to scene meters.
+  ///
+  /// A value of 0.01 maps 1° of latitude/longitude to 0.01m in the scene.
+  /// Adjust this to control annotation spread in the immersive map.
+  public static let geoToSceneScale: Float = 0.01
+
+  /// Height offset (meters) for floating annotation tags above the map surface.
+  public static let annotationYOffset: Float = 0.18
+
+  /// Base height of the map surface below the origin.
+  public static let mapSurfaceY: Float = -0.3
+
+  /// Width and depth of the map surface in meters.
+  public static let mapSurfaceSize: Float = 2.5
+
+  /// Radius of annotation marker spheres in meters.
+  public static let annotationMarkerRadius: Float = 0.018
+
+  /// Radius of the vertical connecting line cylinders.
+  public static let annotationLineRadius: Float = 0.002
+
+  /// Ambient light intensity for the immersive scene.
+  public static let ambientLightIntensity: Float = 600
+
+  // MARK: - Scene Transitions
+
+  /// Delay (seconds) between closing one spatial scene and opening another.
+  ///
+  /// Gives visionOS enough time to complete the close animation
+  /// before starting the open animation, preventing visual glitches.
+  public static let interSceneTransitionDelay: TimeInterval = 0.4
+
+  /// Duration (seconds) of the idle rotation pause after a gesture interaction.
+  ///
+  /// After the user finishes manipulating a volumetric model, idle rotation
+  /// resumes after this interval.
+  public static let idleRotationResumeDelay: TimeInterval = 2.0
 }
