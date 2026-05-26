@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Privacy Permission Strings -->
+	<!-- Required for CoreLocation map centering and region-based news queries. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Nerve uses your location to show news happening near you on the map.</string>
+	<!-- Required for ARKit camera-based surface detection on iOS. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Nerve uses the camera to display 3D news models in augmented reality.</string>
+	<!-- Background Task Identifiers -->
+	<!-- Required for BGTaskScheduler to accept registration of the news refresh task. -->
+	<!-- See: AppBootstrapper.registerBackgroundTasks() -->
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.davudgunduz.Nerve.newsRefresh</string>
+	</array>
+	<!-- Background Modes -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
+	<!-- Scene Manifest -->
+	<!-- Required for visionOS multi-window support (Volumetric WindowGroup + ImmersiveSpace). -->
+	<!-- Without this, openWindow(id:) fails with "app does not support multiple scenes". -->
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<true/>
+	</dict>
+</dict>
+</plist>

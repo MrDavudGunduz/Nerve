@@ -25,6 +25,17 @@ import SwiftUI
 /// - **2D Window** (all platforms): ``ContentView`` with tab/sidebar navigation.
 /// - **Volumetric Window** (visionOS): ``VolumetricNewsView`` for 3D news models.
 /// - **Immersive Space** (visionOS): ``SpatialMapView`` for the spatial news map.
+///
+/// ## visionOS Scene Transitions
+///
+/// The ``SpatialTransitionManager`` orchestrates smooth transitions between
+/// the three scene tiers:
+///
+/// ```
+/// Standard 2D ←→ Volumetric 3D
+/// Standard 2D ←→ Immersive Space
+/// Volumetric 3D → (via Standard) → Immersive Space
+/// ```
 @main
 struct NerveApp: App {
 
@@ -37,11 +48,24 @@ struct NerveApp: App {
   /// can access services without global static coupling.
   private let container = DependencyContainer()
 
+  /// Manages transitions between 2D, Volumetric, and Immersive scenes on visionOS.
+  ///
+  /// Shared across the 2D window and the spatial toolbar to ensure
+  /// consistent state tracking and prevent overlapping transitions.
+  #if os(visionOS)
+    @State private var transitionManager = SpatialTransitionManager()
+  #endif
+
   // MARK: - Logging
 
   /// Logger for app-level lifecycle events.
+  ///
+  /// Uses a hardcoded subsystem string instead of `Bundle.main.bundleIdentifier`
+  /// because static `let` initializers run before the `@main` struct is fully
+  /// constructed — `Bundle.main` may not be fully available at that point,
+  /// risking a crash or incorrect subsystem resolution.
   private static let logger = Logger(
-    subsystem: Bundle.main.bundleIdentifier ?? "com.davudgunduz.Nerve",
+    subsystem: LogSubsystem.main,
     category: "AppLifecycle"
   )
 
@@ -53,6 +77,10 @@ struct NerveApp: App {
   /// All platform targets share the same schema and storage strategy.
   /// Model types are sourced from ``ModelRegistry/allModels`` to prevent
   /// forgotten registrations.
+  ///
+  /// Uses ``NerveSchemaMigrationPlan`` to ensure safe schema evolution
+  /// across app updates. Without a migration plan, any schema change
+  /// would cause either a crash or silent database reset.
   ///
   /// If persistent storage creation fails (e.g., migration issues),
   /// falls back to an in-memory container and logs the error
@@ -67,6 +95,7 @@ struct NerveApp: App {
     do {
       return try ModelContainer(
         for: schema,
+        migrationPlan: NerveSchemaMigrationPlan.self,
         configurations: [modelConfiguration]
       )
     } catch {
@@ -85,6 +114,7 @@ struct NerveApp: App {
       do {
         return try ModelContainer(
           for: schema,
+          migrationPlan: NerveSchemaMigrationPlan.self,
           configurations: [fallbackConfig]
         )
       } catch {
@@ -98,25 +128,45 @@ struct NerveApp: App {
 
   // MARK: - Scene
 
+  @Environment(\.scenePhase) private var scenePhase
+
   var body: some Scene {
     // Primary 2D window — all platforms.
     WindowGroup {
       ContentView()
         .environment(\.dependencyContainer, container)
+        #if os(visionOS)
+          .overlay(alignment: .bottom) {
+            SpatialSceneToolbar(transitionManager: transitionManager)
+          }
+        #endif
         .task {
           await AppBootstrapper.bootstrap(
             container: container,
             modelContainer: sharedModelContainer
           )
+          // Schedule the first background refresh after bootstrap completes.
+          AppBootstrapper.scheduleBackgroundRefresh()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+          if newPhase == .background {
+            AppBootstrapper.scheduleBackgroundRefresh()
+          }
         }
     }
     .modelContainer(sharedModelContainer)
 
     // visionOS: Volumetric 3D news viewer.
     #if os(visionOS)
-      WindowGroup(id: "news-3d-viewer") {
+      WindowGroup(id: SpatialTransitionManager.volumetricWindowID) {
         VolumetricNewsView()
           .environment(\.dependencyContainer, container)
+          .onDisappear {
+            // Sync transition manager if user closes via system UI.
+            if transitionManager.currentMode == .volumetric {
+              transitionManager.resetToStandard()
+            }
+          }
       }
       .windowStyle(.volumetric)
       .defaultSize(
@@ -127,8 +177,14 @@ struct NerveApp: App {
       )
 
       // visionOS: Immersive spatial map experience.
-      ImmersiveSpace(id: "spatial-map") {
+      ImmersiveSpace(id: SpatialTransitionManager.immersiveSpaceID) {
         SpatialMapView()
+          .onDisappear {
+            // Sync transition manager if user closes via system UI.
+            if transitionManager.currentMode == .immersive {
+              transitionManager.resetToStandard()
+            }
+          }
       }
       .immersionStyle(selection: .constant(.mixed), in: .mixed)
     #endif

@@ -1,7 +1,7 @@
 # Nerve — Development Roadmap
 
 > **Timeline:** 5 Weeks  
-> **Last Updated:** April 19, 2026  
+> **Last Updated:** May 19, 2026  
 > **Project Overview:** See [README.md](README.md)
 
 ---
@@ -373,8 +373,8 @@ struct ARNewsView: View {
 
 #### 4.2 — visionOS: Volumetric News Explorer
 
-- [ ] Create a **Volumetric Window** that detaches 3D news models from the 2D interface into the user's physical space.
-- [ ] Implement `WindowGroup` with `.windowStyle(.volumetric)` for spatial content:
+- [x] Create a **Volumetric Window** that detaches 3D news models from the 2D interface into the user's physical space.
+- [x] Implement `WindowGroup` with `.windowStyle(.volumetric)` for spatial content:
 
 ```swift
 @main
@@ -395,7 +395,7 @@ struct NerveApp: App {
 }
 ```
 
-- [ ] Build an **Immersive Space** for the spatial map experience:
+- [x] Build an **Immersive Space** for the spatial map experience:
   - Render the news map as a topographical 3D surface the user can walk around.
   - News annotations become floating 3D tags hovering above their geographic locations.
   - Implement **gaze + pinch** interaction for selecting annotations in visionOS.
@@ -407,8 +407,8 @@ ImmersiveSpace(id: "spatial-map") {
 .immersionStyle(selection: .constant(.mixed), in: .mixed)
 ```
 
-- [ ] Implement smooth **transitions** between 2D window → Volumetric Window → Immersive Space.
-- [ ] Add **spatial audio** cues for annotation selection and model interaction events.
+- [x] Implement smooth **transitions** between 2D window → Volumetric Window → Immersive Space.
+- [x] Add **spatial audio** cues for annotation selection and model interaction events.
 
 #### 4.3 — 3D Asset Pipeline
 
@@ -605,20 +605,24 @@ These items span all phases and should be addressed continuously:
 ### Code Quality
 
 - [x] Require **Swift Concurrency strict checking** (`SWIFT_STRICT_CONCURRENCY = complete`).
-- [ ] Enforce **SwiftLint** with a shared configuration across all packages.
+- [x] Enforce **SwiftLint** with a shared configuration across all packages.
 - [x] Maintain clear documentation via inline `///` doc comments on all public APIs.
+- [x] Centralize logger subsystem identifiers via `LogSubsystem` constants.
 
 ### CI/CD Pipeline
 
-- [ ] Configure GitHub Actions (or Xcode Cloud) to build & test all three platform targets on every PR.
-- [ ] Automate SwiftLint checks as a CI gate.
-- [ ] Set up code coverage reporting with a **minimum threshold of 80%**.
-- [ ] Run Thread Sanitizer (TSan) on every PR to catch data races early.
-- [ ] Fail the build if any test target drops below its minimum coverage threshold.
+- [x] Configure GitHub Actions to build & test all three platform targets on every PR.
+- [x] Automate SwiftLint checks as a CI gate.
+- [x] Set up code coverage reporting with a **minimum threshold of 80%**.
+- [x] Run Thread Sanitizer (TSan) on every PR to catch data races early.
+- [x] Fail the build if any test target drops below its minimum coverage threshold.
 
 ### Accessibility
 
-- [ ] Ensure VoiceOver compatibility on all interactive map elements.
+- [x] Ensure VoiceOver compatibility on all interactive map elements.
+- [x] Support `Reduce Motion` preference on all animation views.
+- [x] Add `accessibilityIdentifier` to all UI test target elements.
+- [x] Post VoiceOver announcements for error states.
 - [ ] Support Dynamic Type for all text content.
 - [ ] Test with Switch Control and Voice Control.
 

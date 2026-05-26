@@ -53,11 +53,11 @@ struct ContentView: View {
           tag: .insights
         )
 
-        placeholderTab(
-          title: "Settings",
-          icon: "gearshape.fill",
-          tag: .settings
-        )
+        SettingsView()
+          .tabItem {
+            Label("Settings", systemImage: "gearshape.fill")
+          }
+          .tag(Tab.settings)
       }
     }
   #endif
@@ -84,7 +84,9 @@ struct ContentView: View {
         switch selectedTab {
         case .map:
           NerveMapView()
-        case .headlines, .insights, .settings:
+        case .settings:
+          SettingsView()
+        case .headlines, .insights:
           VStack(spacing: 16) {
             Image(systemName: tabIcon(for: selectedTab))
               .font(.system(size: 48))
@@ -139,7 +141,12 @@ struct ContentView: View {
 
 // MARK: - Tab
 
-private enum Tab: Hashable {
+/// The navigation tabs available in the root view.
+///
+/// Declared `internal` (rather than `private`) to support future deep-link
+/// routing and navigation coordination from ``AppBootstrapper`` or URL
+/// handlers. See DEVELOPMENT_ROADMAP Phase 5 — Navigation & Deep Linking.
+enum Tab: Hashable {
   case map, headlines, insights, settings
 
   var title: String {
