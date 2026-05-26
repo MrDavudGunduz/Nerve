@@ -175,20 +175,32 @@ public struct NewsItem: Sendable, Codable, Identifiable {
 
 // MARK: - Equatable
 
-/// Identity-based equality: two `NewsItem`s are equal if they share the same `id`.
+/// Content-aware equality: two `NewsItem`s are equal if they share the
+/// same `id` **and** the same `analysis` result.
 ///
-/// This prevents unnecessary UI diffing (e.g., annotation re-rendering in MapKit)
-/// when only the `analysis` result changes after AI enrichment. Auto-synthesized
-/// `Equatable` would compare *all* properties, causing spurious inequality.
+/// Including `analysis` ensures SwiftUI detects credibility badge updates
+/// after AI enrichment — a pure ID comparison would return `true` for an
+/// item before and after analysis, suppressing the UI diff.
+///
+/// All other fields (headline, summary, coordinate, etc.) are sourced from
+/// the upstream API and never mutate for a given ID within a single session,
+/// so comparing them would add cost without benefit.
 extension NewsItem: Equatable {
   public static func == (lhs: NewsItem, rhs: NewsItem) -> Bool {
-    lhs.id == rhs.id
+    lhs.id == rhs.id && lhs.analysis == rhs.analysis
   }
 }
 
 // MARK: - Hashable
 
-/// Identity-based hashing consistent with the custom `Equatable` above.
+/// Identity-based hashing — uses only `id` for O(1) Set/Dictionary lookup.
+///
+/// `Hashable` requires: if `a == b`, then `a.hashValue == b.hashValue`.
+/// The reverse is NOT required. Since our `==` compares `id + analysis`,
+/// hashing only `id` satisfies the contract — equal items always share an
+/// `id`, so they always share a hash. Two items with the same `id` but
+/// different `analysis` hash identically, which is correct (they collide
+/// in the same bucket and `==` disambiguates).
 extension NewsItem: Hashable {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(id)

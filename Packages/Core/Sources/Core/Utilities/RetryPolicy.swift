@@ -70,7 +70,7 @@ public enum RetryPolicy: Sendable {
   // MARK: - Logging
 
   private static let logger = Logger(
-    subsystem: "com.davudgunduz.Nerve",
+    subsystem: LogSubsystem.main,
     category: "RetryPolicy"
   )
 

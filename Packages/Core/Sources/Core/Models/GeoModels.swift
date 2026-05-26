@@ -96,15 +96,22 @@ public struct GeoRegion: Sendable, Codable, Hashable {
   /// The radius of the region in meters.
   public let radiusMeters: Double
 
+  /// Maximum allowable radius in meters (half of Earth's circumference ≈ 20,038 km).
+  ///
+  /// Any radius exceeding this value is physically meaningless on Earth
+  /// and would cause the persistence layer to perform full-table scans.
+  public static let maxRadiusMeters: Double = 20_038_000
+
   /// Creates a region with the given center and radius.
   ///
-  /// Returns `nil` if `radiusMeters` is zero or negative.
+  /// Returns `nil` if `radiusMeters` is zero, negative, or exceeds
+  /// ``maxRadiusMeters`` (Earth's half-circumference).
   ///
   /// - Parameters:
   ///   - center: The center point of the region.
-  ///   - radiusMeters: The radius in meters (must be > 0).
+  ///   - radiusMeters: The radius in meters (must be in `0 ..< maxRadiusMeters`).
   public init?(center: GeoCoordinate, radiusMeters: Double) {
-    guard radiusMeters > 0 else { return nil }
+    guard radiusMeters > 0, radiusMeters <= Self.maxRadiusMeters else { return nil }
     self.center = center
     self.radiusMeters = radiusMeters
   }

@@ -95,6 +95,12 @@ public actor DependencyContainer {
   /// Keys currently being resolved — used to detect circular dependencies.
   private var resolvingKeys: Set<ServiceKey> = []
 
+  /// In-flight singleton/scoped factory tasks — prevents duplicate factory
+  /// execution during actor reentrancy. When a second `resolve()` call arrives
+  /// while the first factory is suspended at `await`, both callers share the
+  /// same `Task` result instead of running the factory twice.
+  private var inflightFactories: [ServiceKey: Task<any Sendable, any Error>] = [:]
+
   // MARK: - Init
 
   /// Creates a new, empty dependency container.
@@ -162,17 +168,36 @@ public actor DependencyContainer {
         return instance
       }
 
-      // 2. Call the factory. Note: we intentionally do NOT use
-      //    `resolvingKeys` here for singleton/scoped lifetimes.
-      //    With actor reentrancy, a concurrent resolve arriving
-      //    during the `await` below is a legitimate parallel call,
-      //    not a circular dependency. The double-check in step 4
-      //    ensures true singleton semantics by returning the first
-      //    cached value when multiple factories race.
-      let instance: any Sendable
-      instance = try await registration.factory()
+      // 2. Coalesce concurrent factory calls: if another resolve for the
+      //    same key is already in flight (suspended at `await` inside the
+      //    factory), join its Task instead of spawning a duplicate.
+      //    This guarantees the factory body runs **exactly once** even
+      //    under actor reentrancy — eliminating duplicate side-effects
+      //    (e.g., creating two URLSession instances for a singleton).
+      let factoryTask: Task<any Sendable, any Error>
+      if let existing = inflightFactories[key] {
+        factoryTask = existing
+      } else {
+        let factory = registration.factory
+        let task = Task<any Sendable, any Error> {
+          try await factory()
+        }
+        inflightFactories[key] = task
+        factoryTask = task
+      }
 
-      // 3. Type-check the factory output.
+      let instance: any Sendable
+      do {
+        instance = try await factoryTask.value
+      } catch {
+        inflightFactories[key] = nil
+        throw error
+      }
+
+      // 3. Clean up inflight tracking.
+      inflightFactories[key] = nil
+
+      // 4. Type-check the factory output.
       guard let typed = instance as? T else {
         throw DependencyError.typeMismatch(
           expected: String(describing: type),
@@ -180,18 +205,13 @@ public actor DependencyContainer {
         )
       }
 
-      // 4. Double-check after await: another concurrent resolve may
-      //    have populated the cache during the suspension point above.
-      //    If so, return the existing cached value for true singleton
-      //    semantics. Otherwise, cache our result.
-      if let alreadyCached = registrations[key]?.cachedInstance,
-        let existing = alreadyCached as? T
-      {
-        return existing
+      // 5. Cache the result (first writer wins — subsequent coalesced
+      //    callers will find the cached instance at step 1).
+      if registrations[key]?.cachedInstance == nil {
+        registrations[key]?.cachedInstance = typed
       }
 
-      registrations[key]?.cachedInstance = typed
-      return typed
+      return (registrations[key]?.cachedInstance as? T) ?? typed
 
     case .transient:
       // Circular dependency detection for transient services.
@@ -243,10 +263,12 @@ public actor DependencyContainer {
     registrations[ServiceKey(type, name: name)] != nil
   }
 
-  /// Removes all registrations and cached instances.
+  /// Removes all registrations, cached instances, and in-flight factory tasks.
   ///
   /// Primarily intended for test teardown.
   public func reset() {
+    for (_, task) in inflightFactories { task.cancel() }
+    inflightFactories.removeAll()
     registrations.removeAll()
   }
 

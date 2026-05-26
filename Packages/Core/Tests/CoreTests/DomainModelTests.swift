@@ -93,6 +93,20 @@ struct DomainModelTests {
     #expect(GeoRegion(center: center, radiusMeters: 0) == nil)
   }
 
+  @Test("GeoRegion rejects radius exceeding Earth's half-circumference")
+  func regionExcessiveRadius() {
+    let center = GeoCoordinate(latitude: 41.0, longitude: 29.0)!
+    // Radius exceeding maxRadiusMeters should be rejected.
+    #expect(GeoRegion(center: center, radiusMeters: 20_038_001) == nil)
+    #expect(GeoRegion(center: center, radiusMeters: .infinity) == nil)
+  }
+
+  @Test("GeoRegion accepts radius at exact maxRadiusMeters boundary")
+  func regionMaxRadiusBoundary() {
+    let center = GeoCoordinate(latitude: 0.0, longitude: 0.0)!
+    #expect(GeoRegion(center: center, radiusMeters: GeoRegion.maxRadiusMeters) != nil)
+  }
+
   @Test("NerveError cross-case comparison returns false")
   func nerveErrorCrossCaseInequality() {
     let network = NerveError.network(message: "x")

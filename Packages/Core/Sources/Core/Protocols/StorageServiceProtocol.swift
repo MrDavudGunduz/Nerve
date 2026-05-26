@@ -47,4 +47,15 @@ public protocol StorageServiceProtocol: Sendable {
   ///
   /// - Throws: A storage error if the prune operation fails.
   func pruneExpiredCache() async throws
+
+  /// Deletes all cached news items in a single batch operation.
+  ///
+  /// Significantly more efficient than iterating ``deleteNews(id:)``
+  /// for each item — performs a single SwiftData fetch + batch delete
+  /// instead of N individual round-trips to the persistence actor.
+  ///
+  /// - Returns: The number of items deleted.
+  /// - Throws: A storage error if the batch delete fails.
+  @discardableResult
+  func deleteAllNews() async throws -> Int
 }

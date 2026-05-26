@@ -128,6 +128,12 @@ public struct NewsCluster: Sendable, Identifiable, Hashable {
     //
     // Truncated to 16 hex characters (64 bits) — sufficient uniqueness for
     // clustering scenarios while reducing memory footprint vs. full 64-char digest.
+    //
+    // Birthday-bound analysis:
+    //   64-bit ID space → 50% collision probability at ~2^32 ≈ 4.3 billion clusters.
+    //   In practice, a single map session produces <1,000 clusters, so collisions
+    //   are astronomically unlikely. If the app ever handles millions of
+    //   simultaneous clusters, increase the prefix from 8 to 16 bytes (128 bits).
     let sortedIDs = items.map(\.id).sorted().joined(separator: ",")
     let digest = SHA256.hash(data: Data(sortedIDs.utf8))
     self.id = digest.prefix(8).compactMap { String(format: "%02x", $0) }.joined()

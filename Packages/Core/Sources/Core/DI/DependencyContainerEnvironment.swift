@@ -53,7 +53,7 @@ private struct DependencyContainerInjectedKey: EnvironmentKey {
 
 /// Logger for environment-related diagnostics.
 private let environmentLogger = Logger(
-  subsystem: "com.davudgunduz.Nerve",
+  subsystem: LogSubsystem.main,
   category: "Environment"
 )
 
