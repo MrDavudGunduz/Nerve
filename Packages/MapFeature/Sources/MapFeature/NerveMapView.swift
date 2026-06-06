@@ -1,10 +1,3 @@
-//
-//  NerveMapView.swift
-//  MapFeature
-//
-//  Created by Davud Gunduz on 02.04.2026.
-//
-
 #if os(iOS) || os(visionOS)
 
   import Core
@@ -21,6 +14,12 @@
   /// Wraps `MKMapView` via `UIViewRepresentable` to support custom annotation
   /// views (`NewsAnnotationView`, `ClusterAnnotationView`) that are not yet
   /// available in the native SwiftUI `Map` API.
+  ///
+  /// ## Dependency Resolution
+  ///
+  /// The view model is resolved from the ``DependencyContainer`` injected
+  /// via `@Environment(\.dependencyContainer)`. If an explicit `viewModel`
+  /// is passed at init time (e.g., in previews/tests), it takes precedence.
   ///
   /// ## Data Flow
   ///
@@ -52,7 +51,20 @@
     // MARK: - State
 
     /// The view model driving map state.
+    ///
+    /// Resolved from ``DependencyContainer`` via ``MapViewModelFactory``
+    /// on first appear. If an explicit `viewModel` is provided at init time,
+    /// that instance is used without DI resolution.
     @State private var viewModel: MapViewModel
+
+    /// Whether the ViewModel was explicitly provided (skip DI resolution).
+    private let isExplicitViewModel: Bool
+
+    /// The DI container from the SwiftUI environment.
+    @Environment(\.dependencyContainer) private var container
+
+    /// Tracks whether DI resolution has been performed.
+    @State private var hasResolvedDependencies = false
 
     /// The initial camera region centred on Istanbul as a fallback.
     private static let fallbackRegion = MKCoordinateRegion(
@@ -65,10 +77,20 @@
 
     /// Creates a map view backed by the given view model.
     ///
-    /// - Parameter viewModel: The ``MapViewModel`` to observe.
-    ///   Defaults to a preview-safe instance with stub services.
-    public init(viewModel: MapViewModel = MapViewModel()) {
-      _viewModel = State(initialValue: viewModel)
+    /// When no `viewModel` is provided, the view resolves one from the
+    /// ``DependencyContainer`` via ``MapViewModelFactory`` on first appear.
+    ///
+    /// - Parameter viewModel: An explicit ``MapViewModel`` to use.
+    ///   Pass `nil` (default) to resolve from the DI container.
+    public init(viewModel: MapViewModel? = nil) {
+      if let viewModel {
+        _viewModel = State(initialValue: viewModel)
+        isExplicitViewModel = true
+      } else {
+        // Temporary stub — replaced by DI resolution in makeUIView's task.
+        _viewModel = State(initialValue: MapViewModel())
+        isExplicitViewModel = false
+      }
     }
 
     // MARK: - UIViewRepresentable
@@ -83,6 +105,9 @@
     ///
     /// Delegates overlay installation to ``MapOverlayConfigurator`` and
     /// launches location tracking via the ``Coordinator``.
+    ///
+    /// When no explicit ViewModel was provided, a DI resolution task
+    /// runs on first creation to wire the real services.
     public func makeUIView(context: Context) -> MKMapView {
       let mapView = MKMapView()
       mapView.delegate = context.coordinator
@@ -107,6 +132,21 @@
 
       // ── Start Location Tracking ──
       context.coordinator.startLocationTask(mapView: mapView)
+
+      // ── DI Resolution (async, first-time only) ──
+      if !isExplicitViewModel && !hasResolvedDependencies {
+        Task { @MainActor in
+          let resolved = await MapViewModelFactory.make(from: container)
+          // Transfer any state that may have accumulated on the stub.
+          viewModel = resolved
+          context.coordinator.viewModel = resolved
+          hasResolvedDependencies = true
+
+          // Re-install overlays with the resolved ViewModel.
+          MapOverlayConfigurator.installAllOverlays(on: mapView, viewModel: resolved)
+          context.coordinator.startLocationTask(mapView: mapView)
+        }
+      }
 
       return mapView
     }
@@ -133,3 +173,4 @@
   }
 
 #endif
+
