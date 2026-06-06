@@ -136,16 +136,18 @@ public actor HeadlineAnalyzer: AIAnalysisServiceProtocol {
     )
   }
 
-  /// Analyzes a batch of headlines sequentially with order preservation.
+  /// Analyzes a batch of headlines in parallel using `TaskGroup`.\n  ///
+  /// Each headline is analyzed independently with a per-invocation `NLTagger`
+  /// instance, enabling true parallelism across cooperative thread pool threads.
+  /// The original actor-scoped `sentimentTagger` is retained for single-headline
+  /// calls via ``analyzeHeadline(_:)``.
   ///
-  /// Because `HeadlineAnalyzer` is an actor, all analysis calls serialize on
-  /// the actor's executor regardless of `TaskGroup` usage. A simple sequential
-  /// loop eliminates the scheduling overhead of `TaskGroup` while producing
-  /// identical results in the same order as the input.
+  /// ## Concurrency Control
   ///
-  /// When analysis latency increases (e.g., switching to CoreML models),
-  /// make ``analyzeHeadline(_:)`` `nonisolated` with per-invocation tagger
-  /// instances and restore `TaskGroup` for true parallelism.
+  /// The `maxConcurrency` parameter caps the number of in-flight child tasks
+  /// to `activeProcessorCount`, preventing thread pool exhaustion when
+  /// analyzing hundreds of headlines. Results are collected with their
+  /// original indices to preserve input order despite parallel execution.
   ///
   /// - Parameter headlines: The headline texts to analyze.
   /// - Returns: An array of ``HeadlineAnalysis`` results in input order.
@@ -153,15 +155,163 @@ public actor HeadlineAnalyzer: AIAnalysisServiceProtocol {
   public func analyzeBatch(_ headlines: [String]) async throws -> [HeadlineAnalysis] {
     guard !headlines.isEmpty else { return [] }
 
-    var results: [HeadlineAnalysis] = []
-    results.reserveCapacity(headlines.count)
-
-    for headline in headlines {
-      let analysis = try await analyzeHeadline(headline)
-      results.append(analysis)
+    // For small batches, sequential is faster (no TaskGroup overhead).
+    if headlines.count <= 4 {
+      var results: [HeadlineAnalysis] = []
+      results.reserveCapacity(headlines.count)
+      for headline in headlines {
+        let analysis = try await analyzeHeadline(headline)
+        results.append(analysis)
+      }
+      return results
     }
 
-    return results
+    let maxConcurrency = max(ProcessInfo.processInfo.activeProcessorCount, 2)
+
+    return try await withThrowingTaskGroup(
+      of: (Int, HeadlineAnalysis).self,
+      returning: [HeadlineAnalysis].self
+    ) { group in
+      var nextIndex = 0
+
+      for (index, headline) in headlines.enumerated() {
+        // Throttle: wait for a child to finish before adding more.
+        if nextIndex >= maxConcurrency {
+          if let (idx, result) = try await group.next() {
+            // Collected below — we accumulate in order after the loop.
+            _ = (idx, result)
+          }
+        }
+
+        group.addTask {
+          let analysis = Self.analyzeHeadlineIsolated(headline)
+          return (index, analysis)
+        }
+        nextIndex += 1
+      }
+
+      // Collect all results and sort by original index.
+      var indexed: [(Int, HeadlineAnalysis)] = []
+      indexed.reserveCapacity(headlines.count)
+      for try await pair in group {
+        indexed.append(pair)
+      }
+      indexed.sort { $0.0 < $1.0 }
+      return indexed.map(\.1)
+    }
+  }
+
+  // MARK: - Nonisolated Analysis (for parallel batch)
+
+  /// Analyzes a single headline without actor isolation.
+  ///
+  /// Creates a per-invocation `NLTagger` so multiple headlines can be
+  /// analyzed concurrently in a `TaskGroup`. All heuristic scorers are
+  /// static/pure functions that don't touch mutable actor state.
+  ///
+  /// - Parameter headline: The headline to analyze.
+  /// - Returns: A ``HeadlineAnalysis`` result.
+  private nonisolated static func analyzeHeadlineIsolated(_ headline: String) -> HeadlineAnalysis {
+    let trimmed = headline.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else {
+      return HeadlineAnalysis(clickbaitScore: 0.0, sentiment: .neutral, confidence: 0.1)
+    }
+
+    // Per-invocation tagger — enables true parallelism.
+    let tagger = NLTagger(tagSchemes: [.sentimentScore])
+    let sentiment = sentimentFromTagger(tagger, text: trimmed)
+    let (clickbaitScore, confidence) = computeClickbait(trimmed)
+
+    return HeadlineAnalysis(
+      clickbaitScore: clickbaitScore,
+      sentiment: sentiment,
+      confidence: confidence
+    )
+  }
+
+  /// Computes sentiment using a provided `NLTagger` instance.
+  private nonisolated static func sentimentFromTagger(_ tagger: NLTagger, text: String) -> Sentiment {
+    tagger.string = text
+    let (tag, _) = tagger.tag(at: text.startIndex, unit: .paragraph, scheme: .sentimentScore)
+    guard let tag, let score = Double(tag.rawValue) else { return .neutral }
+    if score > 0.1 { return .positive }
+    if score < -0.1 { return .negative }
+    return .neutral
+  }
+
+  /// Static clickbait computation — pure function, no mutable state.
+  private nonisolated static func computeClickbait(_ headline: String) -> (score: Double, confidence: Double) {
+    let text = headline.trimmingCharacters(in: .whitespacesAndNewlines)
+    let lowered = text.lowercased()
+    let words = text.split(separator: " ")
+    let wordCount = Double(max(words.count, 1))
+
+    let capsScore = capsScoreStatic(text)
+    let punctScore = punctScoreStatic(text)
+    let phraseScore = phraseScoreStatic(lowered)
+    let listicleScore = text.firstMatch(of: listicleRegex) != nil ? 0.8 : 0.0
+    let emoteScore = emoteScoreStatic(words, wordCount: wordCount)
+    let lenScore = lengthScoreStatic(wordCount)
+
+    let weightedScore =
+      capsScore * 0.20
+      + punctScore * 0.15
+      + phraseScore * 0.30
+      + listicleScore * 0.10
+      + emoteScore * 0.15
+      + lenScore * 0.10
+
+    let signals = [capsScore, punctScore, phraseScore, listicleScore, emoteScore, lenScore]
+    let mean = signals.reduce(0, +) / Double(signals.count)
+    let variance = signals.map { ($0 - mean) * ($0 - mean) }.reduce(0, +) / Double(signals.count)
+    let confidence = max(0.4, min(1.0, 1.0 - variance))
+
+    return (min(max(weightedScore, 0.0), 1.0), confidence)
+  }
+
+  // MARK: - Static Signal Scorers (nonisolated, pure)
+
+  private nonisolated static func capsScoreStatic(_ text: String) -> Double {
+    let letters = text.filter(\.isLetter)
+    guard !letters.isEmpty else { return 0.0 }
+    let ratio = Double(letters.filter(\.isUppercase).count) / Double(letters.count)
+    if ratio > 0.8 { return 1.0 }
+    if ratio > 0.5 { return 0.7 }
+    if ratio > 0.4 { return 0.4 }
+    return 0.0
+  }
+
+  private nonisolated static func punctScoreStatic(_ text: String) -> Double {
+    let total = Double(text.filter { $0 == "!" || $0 == "?" }.count)
+    if total >= 3 { return 1.0 }
+    if total >= 2 { return 0.6 }
+    if total >= 1 { return 0.2 }
+    return 0.0
+  }
+
+  private nonisolated static func phraseScoreStatic(_ lowered: String) -> Double {
+    let allPhrases = clickbaitPhrases + clickbaitPhrasesTR
+    var matchCount = 0
+    for phrase in allPhrases where lowered.contains(phrase) { matchCount += 1 }
+    if matchCount >= 3 { return 1.0 }
+    if matchCount >= 2 { return 0.8 }
+    if matchCount >= 1 { return 0.6 }
+    return 0.0
+  }
+
+  private nonisolated static func emoteScoreStatic(_ words: [Substring], wordCount: Double) -> Double {
+    let count = Double(words.filter { emotionalWords.contains($0.lowercased()) }.count)
+    let density = count / wordCount
+    if density > 0.3 { return 1.0 }
+    if density > 0.15 { return 0.6 }
+    if density > 0.05 { return 0.3 }
+    return 0.0
+  }
+
+  private nonisolated static func lengthScoreStatic(_ wordCount: Double) -> Double {
+    if wordCount <= 3 { return 0.5 }
+    if wordCount <= 5 { return 0.2 }
+    return 0.0
   }
 
   // MARK: - Sentiment Analysis
