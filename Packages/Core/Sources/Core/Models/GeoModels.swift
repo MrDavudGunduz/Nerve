@@ -115,4 +115,47 @@ public struct GeoRegion: Sendable, Codable, Hashable {
     self.center = center
     self.radiusMeters = radiusMeters
   }
+
+  // MARK: - Bounding Box
+
+  /// An axis-aligned bounding box in geographic coordinates.
+  ///
+  /// Used by both ``NetworkLayer`` and ``StorageLayer`` for spatial queries.
+  /// Centralizing the computation here eliminates formula duplication and
+  /// ensures consistent bounding-box semantics across the codebase.
+  public struct BoundingBox: Sendable, Hashable {
+    /// Minimum latitude of the bounding box.
+    public let minLatitude: Double
+    /// Maximum latitude of the bounding box.
+    public let maxLatitude: Double
+    /// Minimum longitude of the bounding box.
+    public let minLongitude: Double
+    /// Maximum longitude of the bounding box.
+    public let maxLongitude: Double
+  }
+
+  /// Computes an approximate bounding box for this region.
+  ///
+  /// The approximation uses:
+  /// - 1° latitude ≈ 111 km
+  /// - Longitude scaling by `cos(latitude)` to account for meridian convergence
+  ///
+  /// A floor of `0.01` on `cos(latitude)` guards against division-by-zero
+  /// at polar latitudes (cos(90°) = 0), capping the bounding box to a
+  /// reasonable maximum width.
+  ///
+  /// This is an **approximation** — downstream consumers (e.g., the clustering
+  /// engine) perform exact spatial filtering when precision matters.
+  public var boundingBox: BoundingBox {
+    let latDelta = radiusMeters / 111_000
+    let cosLat = max(cos(center.latitude * .pi / 180), 0.01)
+    let lonDelta = radiusMeters / (111_000 * cosLat)
+
+    return BoundingBox(
+      minLatitude: center.latitude - latDelta,
+      maxLatitude: center.latitude + latDelta,
+      minLongitude: center.longitude - lonDelta,
+      maxLongitude: center.longitude + lonDelta
+    )
+  }
 }

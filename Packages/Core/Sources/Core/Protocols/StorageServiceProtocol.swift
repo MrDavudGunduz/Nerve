@@ -58,4 +58,14 @@ public protocol StorageServiceProtocol: Sendable {
   /// - Throws: A storage error if the batch delete fails.
   @discardableResult
   func deleteAllNews() async throws -> Int
+
+  /// Returns the total number of cached news items without loading them into memory.
+  ///
+  /// Prefer this over `fetchNews(in: nil, limit: nil, offset: nil).count`
+  /// which materializes every record into a `NewsItem` instance. This method
+  /// uses SwiftData's `fetchCount` for an O(1) database-level count query.
+  ///
+  /// - Returns: The number of persisted news items.
+  /// - Throws: A storage error if the count query fails.
+  func cachedNewsCount() async throws -> Int
 }
