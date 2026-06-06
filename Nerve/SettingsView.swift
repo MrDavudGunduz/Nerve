@@ -157,42 +157,62 @@ struct SettingsView: View {
     }
   }
 
-  // MARK: - Developer Section (DEBUG only)
+  // MARK: - Developer Section
 
+  /// Developer section visibility is controlled by ``FeatureFlags/developerSettingsVisible``.
+  ///
+  /// In DEBUG builds, this flag defaults to `true` and can be toggled at runtime
+  /// via the FeatureFlags override system. In RELEASE builds, the section is
+  /// compiled out entirely.
   #if DEBUG
+    @ViewBuilder
     private var developerSection: some View {
-      Section("Developer") {
-        HStack {
-          Label("Swift Version", systemImage: "swift")
-          Spacer()
-          Text("6.0")
-            .foregroundStyle(.secondary)
-            .font(.system(.body, design: .monospaced))
+      if FeatureFlags.developerSettingsVisible {
+        Section("Developer") {
+          HStack {
+            Label("Swift Version", systemImage: "swift")
+            Spacer()
+            Text("6.0")
+              .foregroundStyle(.secondary)
+              .font(.system(.body, design: .monospaced))
+          }
+
+          HStack {
+            Label("Concurrency", systemImage: "checkmark.shield.fill")
+            Spacer()
+            Text("Strict")
+              .foregroundStyle(.green)
+              .font(.system(.body, design: .monospaced))
+          }
+
+          HStack {
+            Label("Build Config", systemImage: "wrench.and.screwdriver.fill")
+            Spacer()
+            Text("DEBUG")
+              .foregroundStyle(.orange)
+              .font(.system(.body, design: .monospaced))
+          }
+
+          Button {
+            Task { await pruneExpiredCache() }
+          } label: {
+            Label("Prune Expired Cache", systemImage: "arrow.triangle.2.circlepath")
+          }
+          .disabled(isPruning)
+          .accessibilityIdentifier("settings-prune-cache")
         }
 
-        HStack {
-          Label("Concurrency", systemImage: "checkmark.shield.fill")
-          Spacer()
-          Text("Strict")
-            .foregroundStyle(.green)
-            .font(.system(.body, design: .monospaced))
+        Section("Feature Flags") {
+          ForEach(FeatureFlags.allFlags, id: \.name) { flag in
+            HStack {
+              Label(flag.name, systemImage: flag.value ? "flag.fill" : "flag")
+              Spacer()
+              Text(flag.value ? "ON" : "OFF")
+                .foregroundStyle(flag.value ? .green : .secondary)
+                .font(.system(.body, design: .monospaced))
+            }
+          }
         }
-
-        HStack {
-          Label("Build Config", systemImage: "wrench.and.screwdriver.fill")
-          Spacer()
-          Text("DEBUG")
-            .foregroundStyle(.orange)
-            .font(.system(.body, design: .monospaced))
-        }
-
-        Button {
-          Task { await pruneExpiredCache() }
-        } label: {
-          Label("Prune Expired Cache", systemImage: "arrow.triangle.2.circlepath")
-        }
-        .disabled(isPruning)
-        .accessibilityIdentifier("settings-prune-cache")
       }
     }
   #endif

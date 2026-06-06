@@ -104,17 +104,21 @@ extension MapViewModel {
           scheduleAnalysis(allItems, in: region, zoomLevel: zoomLevel)
         } else if cached.isEmpty {
           #if DEBUG
-            // Seed data injected ONLY in debug builds for development.
-            // Intentionally NOT persisted — seed data stays in-memory only
-            // to prevent stale demo data from leaking into production
-            // SwiftData stores across build configurations.
-            logger.info("Empty data — loading seed data for development (in-memory only).")
-            let seed = SeedData.istanbulItems
-            allItems = seed
-            await updateClusters(with: seed, in: region, zoomLevel: zoomLevel)
+            if FeatureFlags.seedDataEnabled {
+              // Seed data injected ONLY when the feature flag is enabled.
+              // Intentionally NOT persisted — seed data stays in-memory only
+              // to prevent stale demo data from leaking into production
+              // SwiftData stores across build configurations.
+              logger.info("Empty data — loading seed data for development (in-memory only).")
+              let seed = SeedData.istanbulItems
+              allItems = seed
+              await updateClusters(with: seed, in: region, zoomLevel: zoomLevel)
 
-            // Analyze seed items for immediate credibility badges.
-            scheduleAnalysis(seed, in: region, zoomLevel: zoomLevel)
+              // Analyze seed items for immediate credibility badges.
+              scheduleAnalysis(seed, in: region, zoomLevel: zoomLevel)
+            } else {
+              logger.info("No data available for this region (seed data disabled via FeatureFlags).")
+            }
           #else
             logger.info("No data available for this region.")
           #endif
