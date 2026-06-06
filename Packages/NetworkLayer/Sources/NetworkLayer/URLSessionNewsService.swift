@@ -166,13 +166,7 @@ public struct URLSessionNewsService: NewsServiceProtocol {
   /// - Throws: ``NerveError/network(message:)`` if the base URL cannot be
   ///   decomposed into `URLComponents` or the final URL is invalid.
   private func buildFetchURL(for region: GeoRegion) throws -> URL {
-    // Approximate bounding box: 1° latitude ≈ 111 km.
-    let latDelta = region.radiusMeters / 111_000
-    // Guard against cos(90°) = 0 at polar latitudes, which would produce
-    // lonDelta = Infinity. The floor of 0.01 caps the maximum bounding box
-    // to ±(radius / 1_110) degrees — still a valid approximation.
-    let cosLat = max(cos(region.center.latitude * .pi / 180), 0.01)
-    let lonDelta = region.radiusMeters / (111_000 * cosLat)
+    let bbox = region.boundingBox
 
     guard var components = URLComponents(
       url: configuration.baseURL.appendingPathComponent("news"),
@@ -185,10 +179,10 @@ public struct URLSessionNewsService: NewsServiceProtocol {
     }
 
     components.queryItems = [
-      URLQueryItem(name: "min_lat", value: String(region.center.latitude - latDelta)),
-      URLQueryItem(name: "max_lat", value: String(region.center.latitude + latDelta)),
-      URLQueryItem(name: "min_lon", value: String(region.center.longitude - lonDelta)),
-      URLQueryItem(name: "max_lon", value: String(region.center.longitude + lonDelta)),
+      URLQueryItem(name: "min_lat", value: String(bbox.minLatitude)),
+      URLQueryItem(name: "max_lat", value: String(bbox.maxLatitude)),
+      URLQueryItem(name: "min_lon", value: String(bbox.minLongitude)),
+      URLQueryItem(name: "max_lon", value: String(bbox.maxLongitude)),
       URLQueryItem(name: "limit", value: "200"),
     ]
 
