@@ -276,7 +276,8 @@ struct DomainModelTests {
   func nerveErrorDebugDescriptions() {
     // debugDescription must include the case tag and full message for structured logging.
     #expect(
-      NerveError.network(message: "timeout").debugDescription == "[NerveError.network] timeout")
+      NerveError.network(message: "timeout").debugDescription
+        == "[NerveError.network] timeout (reason: other)")
     #expect(NerveError.storage(message: "full").debugDescription == "[NerveError.storage] full")
     #expect(NerveError.ai(message: "model fail").debugDescription == "[NerveError.ai] model fail")
     #expect(
