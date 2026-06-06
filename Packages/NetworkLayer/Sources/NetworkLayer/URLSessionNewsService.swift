@@ -280,7 +280,7 @@ public struct URLSessionNewsService: NewsServiceProtocol {
     if let nerveError = error as? NerveError {
       switch nerveError {
       case .network(_, let reason, _):
-        return reason?.isRetryable ?? false
+        return reason.isRetryable
       default:
         return false
       }

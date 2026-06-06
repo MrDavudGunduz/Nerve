@@ -157,7 +157,7 @@ struct HTTPStatusCodeTests {
       reason: .rateLimited
     )
     if case .network(_, let reason, _) = error {
-      #expect(reason?.isRetryable == true)
+      #expect(reason.isRetryable == true)
     }
   }
 
@@ -168,7 +168,7 @@ struct HTTPStatusCodeTests {
       reason: .serverError
     )
     if case .network(_, let reason, _) = error {
-      #expect(reason?.isRetryable == true)
+      #expect(reason.isRetryable == true)
     }
   }
 
@@ -179,7 +179,7 @@ struct HTTPStatusCodeTests {
       reason: .unauthorized
     )
     if case .network(_, let reason, _) = error {
-      #expect(reason?.isRetryable == false)
+      #expect(reason.isRetryable == false)
     }
   }
 
@@ -190,7 +190,7 @@ struct HTTPStatusCodeTests {
       reason: .notFound
     )
     if case .network(_, let reason, _) = error {
-      #expect(reason?.isRetryable == false)
+      #expect(reason.isRetryable == false)
     }
   }
 
@@ -220,13 +220,14 @@ struct HTTPStatusCodeTests {
     #expect(allCases.count == 8)
   }
 
-  @Test("NerveError.network without reason defaults isRetryable to false")
-  func noReasonDefaultsToNotRetryable() {
+  @Test("NerveError.network without explicit reason defaults to .other (not retryable)")
+  func noReasonDefaultsToOther() {
     let error = NerveError.network(
       message: "Unknown error."
     )
     if case .network(_, let reason, _) = error {
-      #expect(reason?.isRetryable ?? false == false)
+      #expect(reason == .other)
+      #expect(reason.isRetryable == false)
     }
   }
 }

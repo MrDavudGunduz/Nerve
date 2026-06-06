@@ -59,7 +59,7 @@ public struct ErrorContext: Sendable {
 /// for deterministic retry decisions.
 ///
 /// ```swift
-/// case .network(_, let reason, _) where reason?.isRetryable == true:
+/// case .network(_, let reason, _) where reason.isRetryable:
 ///   // safe to retry
 /// ```
 public enum NetworkErrorReason: String, Sendable, Codable, Equatable {
@@ -115,9 +115,11 @@ public enum NerveError: Error, Sendable {
   ///
   /// - Parameters:
   ///   - message: Human-readable description of the failure.
-  ///   - reason: Structured classification for retry logic.
+  ///   - reason: Structured classification for retry logic. Defaults to `.other`
+  ///     when the failure mode is unclassified. **Never** `nil` — callers can always
+  ///     pattern-match on `reason.isRetryable` without optional unwrapping.
   ///   - context: Optional diagnostic context.
-  case network(message: String, reason: NetworkErrorReason? = nil, context: ErrorContext? = nil)
+  case network(message: String, reason: NetworkErrorReason = .other, context: ErrorContext? = nil)
 
   /// A persistence or storage operation failed.
   case storage(message: String, context: ErrorContext? = nil)
@@ -185,8 +187,7 @@ extension NerveError: CustomDebugStringConvertible {
   public var debugDescription: String {
     switch self {
     case .network(let message, let reason, _):
-      let suffix = reason.map { " (reason: \($0.rawValue))" } ?? ""
-      return "[NerveError.network] \(message)\(suffix)"
+      return "[NerveError.network] \(message) (reason: \(reason.rawValue))"
     case .storage(let message, _): return "[NerveError.storage] \(message)"
     case .ai(let message, _): return "[NerveError.ai] \(message)"
     case .location(let message, _): return "[NerveError.location] \(message)"

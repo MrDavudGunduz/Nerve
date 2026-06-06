@@ -48,11 +48,12 @@ struct NetworkErrorReasonTests {
     #expect(desc.contains("HTTP 429"), "Debug description should include message")
   }
 
-  @Test("NerveError.network without reason has no suffix")
-  func networkErrorWithoutReason() {
+  @Test("NerveError.network without explicit reason defaults to .other")
+  func networkErrorDefaultsToOtherReason() {
     let error = NerveError.network(message: "Unknown failure")
     let desc = error.debugDescription
-    #expect(!desc.contains("reason:"), "No reason suffix when reason is nil")
+    // reason is now non-optional — default is .other, always included in debugDescription.
+    #expect(desc.contains("reason: other"), "Default reason .other should appear in debugDescription")
   }
 
   @Test("NerveError.network Equatable considers reason")
@@ -60,11 +61,13 @@ struct NetworkErrorReasonTests {
     let error1 = NerveError.network(message: "fail", reason: .timeout)
     let error2 = NerveError.network(message: "fail", reason: .timeout)
     let error3 = NerveError.network(message: "fail", reason: .rateLimited)
-    let error4 = NerveError.network(message: "fail")
+    let error4 = NerveError.network(message: "fail")  // defaults to .other
+    let error5 = NerveError.network(message: "fail", reason: .other)
 
     #expect(error1 == error2, "Same message + reason should be equal")
     #expect(error1 != error3, "Different reasons should not be equal")
-    #expect(error1 != error4, "With-reason vs without-reason should not be equal")
+    #expect(error1 != error4, ".timeout vs default .other should not be equal")
+    #expect(error4 == error5, "Default .other should equal explicit .other")
   }
 
   @Test("NetworkErrorReason is Codable round-trip safe")

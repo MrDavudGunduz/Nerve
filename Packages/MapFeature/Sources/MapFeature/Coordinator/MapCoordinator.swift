@@ -44,7 +44,12 @@
 
       // MARK: - Properties
 
-      let viewModel: MapViewModel
+      /// The view model bridged by this coordinator.
+      ///
+      /// Initially set to the ``NerveMapView``'s ViewModel (which may be a
+      /// stub). Replaced with the DI-resolved instance once
+      /// ``MapViewModelFactory`` completes async resolution.
+      var viewModel: MapViewModel
 
       /// Tracks the radius of the last region that triggered `loadNews`.
       var lastLoadedRadiusMeters: Double = 0
