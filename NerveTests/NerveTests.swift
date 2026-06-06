@@ -143,6 +143,7 @@ private struct StubStorageService: StorageServiceProtocol {
   func pruneExpiredCache() async throws {}
   @discardableResult
   func deleteAllNews() async throws -> Int { 0 }
+  func cachedNewsCount() async throws -> Int { 0 }
 }
 
 /// Actor-isolated call counter for thread-safe test assertions.

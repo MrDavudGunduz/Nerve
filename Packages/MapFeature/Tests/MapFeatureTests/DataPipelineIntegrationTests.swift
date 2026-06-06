@@ -45,6 +45,8 @@ struct DataPipelineIntegrationTests {
       items.removeAll()
       return count
     }
+
+    func cachedNewsCount() async throws -> Int { items.count }
   }
 
   /// A news service that returns a fixed set of items.

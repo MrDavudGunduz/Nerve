@@ -150,7 +150,7 @@ struct SettingsView: View {
       }
       .accessibilityIdentifier("settings-build")
 
-      Link(destination: URL(string: "https://github.com/MrDavudGunduz/Nerve")!) {
+      Link(destination: Self.githubURL) {
         Label("Source Code", systemImage: "chevron.left.forwardslash.chevron.right")
       }
       .accessibilityIdentifier("settings-source-code")
@@ -244,8 +244,7 @@ struct SettingsView: View {
 
     do {
       let storageService = try await container.resolve(StorageServiceProtocol.self)
-      let items = try await storageService.fetchNews(in: nil, limit: nil, offset: nil)
-      cachedItemCount = items.count
+      cachedItemCount = try await storageService.cachedNewsCount()
     } catch {
       Self.logger.warning("Failed to load cached item count: \(error.localizedDescription)")
       cachedItemCount = nil
@@ -314,6 +313,21 @@ struct SettingsView: View {
   private var buildNumber: String {
     Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
   }
+
+  // MARK: - Constants
+
+  /// Safe static URL — avoids force-unwrapping a hardcoded string.
+  ///
+  /// Extracted to a static let so the URL is constructed once at class load
+  /// and any typo-induced `nil` is caught by the `assertionFailure`.
+  private static let githubURL: URL = {
+    guard let url = URL(string: "https://github.com/MrDavudGunduz/Nerve") else {
+      assertionFailure("Invalid GitHub URL literal")
+      // Fallback: should never be reached for a valid string literal.
+      return URL(string: "https://github.com")!
+    }
+    return url
+  }()
 }
 
 // MARK: - Preview

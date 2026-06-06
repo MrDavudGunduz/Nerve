@@ -29,6 +29,7 @@ struct StubStorageServiceInternal: StorageServiceProtocol, Sendable {
   func pruneExpiredCache() async throws {}
   @discardableResult
   func deleteAllNews() async throws -> Int { 0 }
+  func cachedNewsCount() async throws -> Int { 0 }
 }
 
 /// Minimal ``LocationServiceProtocol`` stub for ``MapViewModel``'s convenience init.

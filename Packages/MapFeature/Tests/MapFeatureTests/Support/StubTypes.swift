@@ -109,6 +109,8 @@ actor SpyStorageService: StorageServiceProtocol {
   @discardableResult
   func deleteAllNews() async throws -> Int { 0 }
 
+  func cachedNewsCount() async throws -> Int { stubbedCachedItems.count }
+
   // MARK: Convenience setter
 
   func set(cached: [NewsItem]) { stubbedCachedItems = cached }

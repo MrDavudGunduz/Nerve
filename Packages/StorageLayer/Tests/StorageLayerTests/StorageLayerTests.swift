@@ -141,6 +141,8 @@ struct StubStorageService: StorageServiceProtocol {
 
   @discardableResult
   func deleteAllNews() async throws -> Int { 0 }
+
+  func cachedNewsCount() async throws -> Int { 0 }
 }
 
 // MARK: - DI Round-Trip Tests

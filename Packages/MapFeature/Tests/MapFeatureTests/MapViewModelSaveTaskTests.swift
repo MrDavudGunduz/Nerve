@@ -171,4 +171,6 @@ private actor SlowSpyStorageService: StorageServiceProtocol {
 
   @discardableResult
   func deleteAllNews() async throws -> Int { 0 }
+
+  func cachedNewsCount() async throws -> Int { 0 }
 }
