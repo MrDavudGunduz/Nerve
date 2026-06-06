@@ -137,4 +137,23 @@ public struct SwiftDataStorageService: StorageServiceProtocol {
       )
     }
   }
+
+  /// Returns the total number of cached news items via a lightweight count query.
+  ///
+  /// Uses ``PersistenceActor/count()`` which delegates to SwiftData's
+  /// `fetchCount` — an O(1) `SELECT COUNT(*)` instead of materializing
+  /// every record into memory.
+  ///
+  /// - Returns: The number of persisted news items.
+  /// - Throws: ``NerveError/storage(message:context:)`` on failure.
+  public func cachedNewsCount() async throws -> Int {
+    do {
+      return try await actor.count()
+    } catch {
+      throw NerveError.storage(
+        message: "cachedNewsCount failed: \(error.localizedDescription)",
+        context: ErrorContext(underlyingError: error)
+      )
+    }
+  }
 }
