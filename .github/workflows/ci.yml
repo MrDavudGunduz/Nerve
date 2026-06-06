@@ -176,19 +176,70 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             | xcbeautify --renderer github-actions || true
 
+  # ── visionOS Compile Check ─────────────────────────────────────────
+  # Compile-only build to catch platform-specific issues early.
+  # visionOS simulators may not be available on all CI runners,
+  # so we build without testing.
+  visionos-build:
+    name: "Build Core Packages (visionOS)"
+    runs-on: macos-15
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          XCODE_VERSION=$(cat .xcode-version)
+          XCODE_PATH="/Applications/Xcode_${XCODE_VERSION}.app/Contents/Developer"
+          if [ -d "$XCODE_PATH" ]; then
+            sudo xcode-select -s "$XCODE_PATH"
+          else
+            echo "⚠️ Xcode ${XCODE_VERSION} not found, using default"
+            xcode-select -p
+          fi
+
+      - name: Build Core (visionOS)
+        run: |
+          xcodebuild build \
+            -scheme Core \
+            -destination 'platform=visionOS Simulator,name=Apple Vision Pro,OS=latest' \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions || true
+        working-directory: Packages/Core
+
+      - name: Build AILayer (visionOS)
+        run: |
+          xcodebuild build \
+            -scheme AILayer \
+            -destination 'platform=visionOS Simulator,name=Apple Vision Pro,OS=latest' \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions || true
+        working-directory: Packages/AILayer
+
+      - name: Build ARFeature (visionOS)
+        run: |
+          xcodebuild build \
+            -scheme ARFeature \
+            -destination 'platform=visionOS Simulator,name=Apple Vision Pro,OS=latest' \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions || true
+        working-directory: Packages/ARFeature
+
   # ── Status Gate ───────────────────────────────────────────────────
   ci-status:
     name: CI Status
     runs-on: ubuntu-latest
-    needs: [lint, spm-tests, app-build]
+    needs: [lint, spm-tests, app-build, visionos-build]
     if: always()
     steps:
       - name: Check Results
         run: |
           if [ "${{ needs.lint.result }}" != "success" ] || \
              [ "${{ needs.spm-tests.result }}" != "success" ] || \
-             [ "${{ needs.app-build.result }}" != "success" ]; then
+             [ "${{ needs.app-build.result }}" != "success" ] || \
+             [ "${{ needs.visionos-build.result }}" != "success" ]; then
             echo "❌ CI failed"
             exit 1
           fi
-          echo "✅ All checks passed (lint + tests + build + coverage)"
+          echo "✅ All checks passed (lint + tests + build + visionOS + coverage)"
