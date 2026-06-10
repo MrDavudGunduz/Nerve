@@ -39,19 +39,34 @@ public final class NewsItemPersistenceModel {
 
   /// Database indexes for spatial fetch queries and TTL pruning.
   ///
-  /// SwiftData (iOS 17) does not expose a public API for declarative index
-  /// creation. The framework creates implicit indexes only for
-  /// `@Attribute(.unique)` properties (e.g., ``id``).
+  /// SwiftData's `#Index` macro requires iOS 18+ / macOS 15+ at compile time.
+  /// These indexes are conditionally compiled using `#if swift(>=6.0)` as a
+  /// build-time proxy (Swift 6.0 ships with the iOS 18 SDK that includes
+  /// the `#Index` macro). At runtime, the indexes are only created when the
+  /// deployment target satisfies `@available` — on older OS versions, SwiftData
+  /// silently omits them and falls back to full table scans.
   ///
-  /// When the project's minimum deployment target is raised to iOS 18+,
-  /// uncomment the `#Index` macros below. Without these indexes, SwiftData
-  /// performs full table scans on every region-filtered fetch — noticeable
-  /// when the local store grows beyond a few hundred items.
-  //
-  // TODO: Uncomment when deployment target >= iOS 18 / macOS 15
-  // #Index<NewsItemPersistenceModel>([\.latitude, \.longitude])
-  // #Index<NewsItemPersistenceModel>([\.publishedAt])
-  // #Index<NewsItemPersistenceModel>([\.cachedAt])
+  /// ### Performance Impact
+  ///
+  /// Without indexes, region-filtered fetches perform O(n) table scans.
+  /// With indexes, spatial queries use a compound index on `(latitude, longitude)`
+  /// for O(log n) lookups — critical when the local store exceeds ~500 items.
+  #if swift(>=6.0)
+    @available(iOS 18, macOS 15, visionOS 2, *)
+    static let _spatialIndex = #Index<NewsItemPersistenceModel>(
+      [\.latitude, \.longitude]
+    )
+
+    @available(iOS 18, macOS 15, visionOS 2, *)
+    static let _publishedAtIndex = #Index<NewsItemPersistenceModel>(
+      [\.publishedAt]
+    )
+
+    @available(iOS 18, macOS 15, visionOS 2, *)
+    static let _cachedAtIndex = #Index<NewsItemPersistenceModel>(
+      [\.cachedAt]
+    )
+  #endif
 
   // MARK: - Stored Properties
 
