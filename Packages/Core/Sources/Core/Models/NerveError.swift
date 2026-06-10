@@ -118,8 +118,17 @@ public enum NerveError: Error, Sendable {
   ///   - reason: Structured classification for retry logic. Defaults to `.other`
   ///     when the failure mode is unclassified. **Never** `nil` — callers can always
   ///     pattern-match on `reason.isRetryable` without optional unwrapping.
+  ///   - retryAfter: Server-suggested delay before the next retry attempt,
+  ///     parsed from the HTTP `Retry-After` response header. `nil` when the
+  ///     server does not provide a recommendation. When present, ``RetryPolicy``
+  ///     uses this value instead of its computed exponential backoff delay.
   ///   - context: Optional diagnostic context.
-  case network(message: String, reason: NetworkErrorReason = .other, context: ErrorContext? = nil)
+  case network(
+    message: String,
+    reason: NetworkErrorReason = .other,
+    retryAfter: TimeInterval? = nil,
+    context: ErrorContext? = nil
+  )
 
   /// A persistence or storage operation failed.
   case storage(message: String, context: ErrorContext? = nil)
@@ -142,7 +151,7 @@ public enum NerveError: Error, Sendable {
 extension NerveError: Equatable {
   public static func == (lhs: NerveError, rhs: NerveError) -> Bool {
     switch (lhs, rhs) {
-    case (.network(let lMsg, let lReason, _), .network(let rMsg, let rReason, _)):
+    case (.network(let lMsg, let lReason, _, _), .network(let rMsg, let rReason, _, _)):
       return lMsg == rMsg && lReason == rReason
     case (.storage(let lMsg, _), .storage(let rMsg, _)):
       return lMsg == rMsg
@@ -186,8 +195,9 @@ extension NerveError: LocalizedError {
 extension NerveError: CustomDebugStringConvertible {
   public var debugDescription: String {
     switch self {
-    case .network(let message, let reason, _):
-      return "[NerveError.network] \(message) (reason: \(reason.rawValue))"
+    case .network(let message, let reason, let retryAfter, _):
+      let retryInfo = retryAfter.map { ", retryAfter: \(String(format: "%.1f", $0))s" } ?? ""
+      return "[NerveError.network] \(message) (reason: \(reason.rawValue)\(retryInfo))"
     case .storage(let message, _): return "[NerveError.storage] \(message)"
     case .ai(let message, _): return "[NerveError.ai] \(message)"
     case .location(let message, _): return "[NerveError.location] \(message)"
