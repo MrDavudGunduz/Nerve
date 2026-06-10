@@ -104,7 +104,7 @@ struct NerveTests {
   @Test("NerveError network variant carries reason")
   func nerveErrorNetworkReason() {
     let error = NerveError.network(message: "timeout", reason: .timeout)
-    if case .network(_, let reason) = error {
+    if case .network(_, let reason, _, _) = error {
       #expect(reason == .timeout)
     } else {
       Issue.record("Expected .network variant")

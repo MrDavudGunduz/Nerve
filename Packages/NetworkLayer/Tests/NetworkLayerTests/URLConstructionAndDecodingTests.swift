@@ -156,7 +156,7 @@ struct HTTPStatusCodeTests {
       message: "Rate limited (HTTP 429).",
       reason: .rateLimited
     )
-    if case .network(_, let reason, _) = error {
+    if case .network(_, let reason, _, _) = error {
       #expect(reason.isRetryable == true)
     }
   }
@@ -167,7 +167,7 @@ struct HTTPStatusCodeTests {
       message: "Server error (HTTP 500).",
       reason: .serverError
     )
-    if case .network(_, let reason, _) = error {
+    if case .network(_, let reason, _, _) = error {
       #expect(reason.isRetryable == true)
     }
   }
@@ -178,7 +178,7 @@ struct HTTPStatusCodeTests {
       message: "Authentication failed (HTTP 401).",
       reason: .unauthorized
     )
-    if case .network(_, let reason, _) = error {
+    if case .network(_, let reason, _, _) = error {
       #expect(reason.isRetryable == false)
     }
   }
@@ -189,7 +189,7 @@ struct HTTPStatusCodeTests {
       message: "Resource not found (HTTP 404).",
       reason: .notFound
     )
-    if case .network(_, let reason, _) = error {
+    if case .network(_, let reason, _, _) = error {
       #expect(reason.isRetryable == false)
     }
   }
@@ -225,7 +225,7 @@ struct HTTPStatusCodeTests {
     let error = NerveError.network(
       message: "Unknown error."
     )
-    if case .network(_, let reason, _) = error {
+    if case .network(_, let reason, _, _) = error {
       #expect(reason == .other)
       #expect(reason.isRetryable == false)
     }
