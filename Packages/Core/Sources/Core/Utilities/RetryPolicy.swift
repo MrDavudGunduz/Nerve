@@ -130,17 +130,34 @@ public enum RetryPolicy: Sendable {
           break
         }
 
-        // Compute jittered delay.
-        let jitter = currentDelay * Double.random(in: -jitterFactor...jitterFactor)
-        let delay = min(currentDelay + jitter, maxDelay)
-
-        logger.info(
-          """
-          Retry \(attempt)/\(maxAttempts) failed: \
-          \(error.localizedDescription, privacy: .public). \
-          Retrying in \(String(format: "%.2f", delay))s…
-          """
-        )
+        // Server-directed delay takes precedence over computed backoff.
+        // When the server sends a `Retry-After` header (attached to
+        // `NerveError.network` via the `retryAfter` field), use that
+        // value directly — it reflects the server's actual rate-limit
+        // window. Falls back to exponential backoff with jitter when
+        // the server provides no recommendation.
+        let delay: TimeInterval
+        if let serverDelay = Self.extractRetryAfter(from: error) {
+          delay = min(serverDelay, maxDelay)
+          logger.info(
+            """
+            Retry \(attempt)/\(maxAttempts) failed: \
+            \(error.localizedDescription, privacy: .public). \
+            Using server-provided Retry-After: \(String(format: "%.1f", delay))s.
+            """
+          )
+        } else {
+          // Compute jittered delay.
+          let jitter = currentDelay * Double.random(in: -jitterFactor...jitterFactor)
+          delay = min(currentDelay + jitter, maxDelay)
+          logger.info(
+            """
+            Retry \(attempt)/\(maxAttempts) failed: \
+            \(error.localizedDescription, privacy: .public). \
+            Retrying in \(String(format: "%.2f", delay))s…
+            """
+          )
+        }
 
         // Sleep using Duration API (replaces deprecated nanosecond-based sleep).
         try await Task.sleep(for: .seconds(delay))
@@ -174,5 +191,25 @@ public enum RetryPolicy: Sendable {
   ) -> TimeInterval {
     let computed = baseDelay * pow(multiplier, Double(attempt))
     return min(computed, maxDelay)
+  }
+
+  // MARK: - Retry-After Extraction
+
+  /// Extracts the server-directed retry delay from a ``NerveError``.
+  ///
+  /// When the error is a ``NerveError/network(message:reason:retryAfter:context:)``
+  /// with a non-nil `retryAfter` value, that value is returned. For all other
+  /// error types, returns `nil` — the caller should fall back to computed backoff.
+  ///
+  /// - Parameter error: The error to inspect.
+  /// - Returns: The server-suggested retry delay, or `nil`.
+  private static func extractRetryAfter(from error: any Error) -> TimeInterval? {
+    guard let nerveError = error as? NerveError else { return nil }
+    switch nerveError {
+    case .network(_, _, let retryAfter, _):
+      return retryAfter
+    default:
+      return nil
+    }
   }
 }
