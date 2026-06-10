@@ -172,14 +172,20 @@ public actor HeadlineAnalyzer: AIAnalysisServiceProtocol {
       of: (Int, HeadlineAnalysis).self,
       returning: [HeadlineAnalysis].self
     ) { group in
-      var nextIndex = 0
+      // Collect results eagerly — including those consumed during throttling.
+      // `ThrowingTaskGroup.next()` yields each child's result exactly once;
+      // results consumed in the throttle block below would be permanently
+      // lost if not appended here.
+      var indexed: [(Int, HeadlineAnalysis)] = []
+      indexed.reserveCapacity(headlines.count)
+      var inFlightCount = 0
 
       for (index, headline) in headlines.enumerated() {
         // Throttle: wait for a child to finish before adding more.
-        if nextIndex >= maxConcurrency {
-          if let (idx, result) = try await group.next() {
-            // Collected below — we accumulate in order after the loop.
-            _ = (idx, result)
+        if inFlightCount >= maxConcurrency {
+          if let pair = try await group.next() {
+            indexed.append(pair)
+            inFlightCount -= 1
           }
         }
 
@@ -187,12 +193,10 @@ public actor HeadlineAnalyzer: AIAnalysisServiceProtocol {
           let analysis = Self.analyzeHeadlineIsolated(headline)
           return (index, analysis)
         }
-        nextIndex += 1
+        inFlightCount += 1
       }
 
-      // Collect all results and sort by original index.
-      var indexed: [(Int, HeadlineAnalysis)] = []
-      indexed.reserveCapacity(headlines.count)
+      // Collect all remaining results and sort by original index.
       for try await pair in group {
         indexed.append(pair)
       }
