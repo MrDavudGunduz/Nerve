@@ -203,6 +203,11 @@ public struct URLSessionNewsService: NewsServiceProtocol {
   /// Each error case populates ``NetworkErrorReason`` so that upstream callers
   /// (e.g. ``MapViewModel`` data pipeline) can make structured retry decisions
   /// via ``NetworkErrorReason/isRetryable`` instead of brittle string matching.
+  ///
+  /// For HTTP 429 (rate limited), the `Retry-After` response header is parsed
+  /// and attached to the error via ``NerveError/network(message:reason:retryAfter:context:)``,
+  /// enabling ``RetryPolicy`` to use server-directed backoff instead of its
+  /// computed exponential delay.
   private static func validateHTTPResponse(_ response: URLResponse, data: Data) throws {
     guard let httpResponse = response as? HTTPURLResponse else {
       throw NerveError.network(
@@ -225,9 +230,11 @@ public struct URLSessionNewsService: NewsServiceProtocol {
         reason: .notFound
       )
     case 429:
+      let retryAfter = Self.parseRetryAfter(from: httpResponse)
       throw NerveError.network(
         message: "Rate limited (HTTP 429). Retrying after backoff.",
-        reason: .rateLimited
+        reason: .rateLimited,
+        retryAfter: retryAfter
       )
     case 500...599:
       throw NerveError.network(
@@ -240,6 +247,54 @@ public struct URLSessionNewsService: NewsServiceProtocol {
         reason: .other
       )
     }
+  }
+
+  // MARK: - Retry-After Parsing
+
+  /// RFC 9110 §10.2.3 HTTP-date formatter used by `Retry-After` header parsing.
+  ///
+  /// `static let` avoids re-creating the formatter on every 429 response.
+  /// The formatter is `Sendable`-safe: its configuration is set once at
+  /// init time and never mutated afterward.
+  private nonisolated(unsafe) static let httpDateFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(abbreviation: "GMT")
+    formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+    return formatter
+  }()
+
+  /// Parses the `Retry-After` response header into a `TimeInterval`.
+  ///
+  /// Supports two formats per RFC 9110 §10.2.3:
+  /// - **Delta-seconds:** e.g. `"120"` → 120.0 seconds.
+  /// - **HTTP-date:** e.g. `"Sun, 10 Jun 2026 18:00:00 GMT"` → seconds until that date.
+  ///
+  /// Returns `nil` when the header is absent, empty, or contains an unparseable value.
+  /// Negative deltas (date in the past) are clamped to `nil` — the caller should
+  /// fall back to its default backoff strategy.
+  ///
+  /// - Parameter response: The HTTP response to extract the header from.
+  /// - Returns: The suggested retry delay in seconds, or `nil`.
+  static func parseRetryAfter(from response: HTTPURLResponse) -> TimeInterval? {
+    guard let retryValue = response.value(forHTTPHeaderField: "Retry-After"),
+      !retryValue.isEmpty
+    else {
+      return nil
+    }
+
+    // Attempt 1: delta-seconds (most common for API rate limiting).
+    if let seconds = TimeInterval(retryValue), seconds > 0 {
+      return seconds
+    }
+
+    // Attempt 2: HTTP-date format.
+    if let retryDate = httpDateFormatter.date(from: retryValue) {
+      let delta = retryDate.timeIntervalSinceNow
+      return delta > 0 ? delta : nil
+    }
+
+    return nil
   }
 
   // MARK: - Retry Classification
@@ -273,7 +328,7 @@ public struct URLSessionNewsService: NewsServiceProtocol {
     // retry decisions instead of string matching.
     if let nerveError = error as? NerveError {
       switch nerveError {
-      case .network(_, let reason, _):
+      case .network(_, let reason, _, _):
         return reason.isRetryable
       default:
         return false
